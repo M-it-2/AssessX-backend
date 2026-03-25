@@ -4,7 +4,7 @@ pre-push:
       run: |
         branch=$(git rev-parse --abbrev-ref HEAD)
         echo "Branch: $branch"
-        echo $branch | grep -qE '^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test|hotfix|release)\/[a-z0-9][a-z0-9-]+$' || {
+        echo $branch | grep -qE '^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test|hotfix|release)/[a-z0-9][a-z0-9-]+$' || {
           echo "Incorrect branch name: $branch"
           echo "Allow names:"
           echo "  build/my-build"
