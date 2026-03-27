@@ -1,3 +1,29 @@
 spring:
   application:
-    name: MITIT
+    name: AssessX
+  config:
+    import: "optional:file:.env[.properties]"
+  datasource:
+    url: jdbc:postgresql://localhost:5432/assessx
+    username: ${DB_USER:assessx}
+    password: ${DB_PASS:assessx}
+    hikari:
+      connection-init-sql: "SET TIME ZONE 'UTC'"
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: ${GITHUB_CLIENT_ID}
+            client-secret: ${GITHUB_CLIENT_SECRET}
+            scope: read:user, user:email
+            redirect-uri: "{baseUrl}/auth/github/callback"
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: 86400000

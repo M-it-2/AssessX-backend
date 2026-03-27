@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: assessx
+      POSTGRES_USER: ${DB_USER:-assessx}
+      POSTGRES_PASSWORD: ${DB_PASS:-assessx}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-assessx} -d assessx"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./AssesX-backend
+    ports:
+      - "8080:8080"
+    environment:
+      DB_USER: ${DB_USER:-assessx}
+      DB_PASS: ${DB_PASS:-assessx}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
