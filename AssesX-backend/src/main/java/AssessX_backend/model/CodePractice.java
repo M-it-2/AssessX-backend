@@ -2,6 +2,8 @@ package AssessX_backend.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "code_practices")
@@ -17,8 +19,8 @@ public class CodePractice {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "unit_tests", nullable = false, columnDefinition = "TEXT")
-    private String unitTests;
+    @OneToMany(mappedBy = "practice", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PracticeUnitTest> unitTests = new ArrayList<>();
 
     @Column(nullable = false)
     private Integer points;
@@ -42,8 +44,8 @@ public class CodePractice {
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
 
-    public String getUnitTests() { return unitTests; }
-    public void setUnitTests(String unitTests) { this.unitTests = unitTests; }
+    public List<PracticeUnitTest> getUnitTests() { return unitTests; }
+    public void setUnitTests(List<PracticeUnitTest> unitTests) { this.unitTests = unitTests; }
 
     public Integer getPoints() { return points; }
     public void setPoints(Integer points) { this.points = points; }
