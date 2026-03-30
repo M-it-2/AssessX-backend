@@ -58,4 +58,8 @@ cd "$ROOT_DIR/AssessX-backend"
 echo "Starting docker compose..."
 cd "$ROOT_DIR"
 
-$DOCKER_CMD compose -f docker-compose.yml -f docker-compose.override.yml up --build
+# dev
+# $DOCKER_CMD compose -f docker-compose.dev.yml up -d 
+
+# prod
+$DOCKER_CMD compose -f docker-compose.yml up -d 
