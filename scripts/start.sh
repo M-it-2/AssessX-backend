@@ -37,6 +37,6 @@ fi
 
 # ── 3. Run Spring Boot ────────────────────────
 echo "[app] Starting Spring Boot on :8080..."
-cd AssesX-backend
+cd AssessX-backend
 ./mvnw spring-boot:run \
   -Dspring-boot.run.jvmArguments="-Duser.timezone=UTC"
