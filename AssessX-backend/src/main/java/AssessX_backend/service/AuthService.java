@@ -2,14 +2,15 @@ package AssessX_backend.service;
 
 import AssessX_backend.dto.CompleteRegistrationRequest;
 import AssessX_backend.dto.UserResponseDto;
+import AssessX_backend.exception.GroupNotFoundException;
+import AssessX_backend.exception.StudentRoleRequiredException;
+import AssessX_backend.exception.UserNotFoundException;
 import AssessX_backend.model.Group;
 import AssessX_backend.model.User;
 import AssessX_backend.repository.GroupRepository;
 import AssessX_backend.repository.UserRepository;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AuthService {
@@ -40,12 +41,10 @@ public class AuthService {
 
         if (req.getGroupId() != null) {
             if (user.getRole() != User.Role.STUDENT) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Only students can be assigned to a group");
+                throw new StudentRoleRequiredException("Only students can be assigned to a group");
             }
             Group group = groupRepository.findById(req.getGroupId())
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.NOT_FOUND, "Group not found: " + req.getGroupId()));
+                    .orElseThrow(() -> new GroupNotFoundException(req.getGroupId()));
             group.getStudents().add(user);
             groupRepository.save(group);
         }
@@ -56,7 +55,6 @@ public class AuthService {
 
     private User findUserById(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "User not found: " + userId));
+                .orElseThrow(() -> new UserNotFoundException(userId));
     }
 }

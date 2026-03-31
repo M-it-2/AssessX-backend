@@ -4,16 +4,17 @@ import AssessX_backend.dto.CreateTestRequest;
 import AssessX_backend.dto.SubmitTestRequest;
 import AssessX_backend.dto.TestResponseDto;
 import AssessX_backend.dto.TestSubmitResultDto;
+import AssessX_backend.exception.TestAnswersParseException;
+import AssessX_backend.exception.TestNotFoundException;
+import AssessX_backend.exception.UserNotFoundException;
 import AssessX_backend.model.Test;
 import AssessX_backend.model.User;
 import AssessX_backend.repository.TestRepository;
 import AssessX_backend.repository.UserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -73,7 +74,7 @@ public class TestService {
     @Transactional
     public void deleteTest(Long id) {
         if (!testRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Test not found: " + id);
+            throw new TestNotFoundException(id);
         }
         testRepository.deleteById(id);
     }
@@ -101,18 +102,17 @@ public class TestService {
         try {
             return objectMapper.readValue(answersJson, new TypeReference<Map<String, String>>() {});
         } catch (Exception e) {
-            throw new ResponseStatusException(
-                    HttpStatus.INTERNAL_SERVER_ERROR, "Failed to parse answers for test: " + testId);
+            throw new TestAnswersParseException(testId);
         }
     }
 
     private Test findTestById(Long id) {
         return testRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Test not found: " + id));
+                .orElseThrow(() -> new TestNotFoundException(id));
     }
 
     private User findUserById(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
+                .orElseThrow(() -> new UserNotFoundException(userId));
     }
 }

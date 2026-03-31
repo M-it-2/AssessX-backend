@@ -1,6 +1,7 @@
 package AssessX_backend.service;
 
 import AssessX_backend.dto.UserResponseDto;
+import AssessX_backend.exception.UserNotFoundException;
 import AssessX_backend.model.Group;
 import AssessX_backend.model.User;
 import AssessX_backend.repository.UserRepository;
@@ -10,7 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -76,7 +76,7 @@ class UserServiceTest {
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> userService.getUserById(99L))
-                .isInstanceOf(ResponseStatusException.class)
+                .isInstanceOf(UserNotFoundException.class)
                 .hasMessageContaining("User not found");
     }
 }

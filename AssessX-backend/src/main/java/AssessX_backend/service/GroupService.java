@@ -3,14 +3,17 @@ package AssessX_backend.service;
 import AssessX_backend.dto.CreateGroupRequest;
 import AssessX_backend.dto.GroupResponseDto;
 import AssessX_backend.dto.UserResponseDto;
+import AssessX_backend.exception.GroupAlreadyExistsException;
+import AssessX_backend.exception.GroupNotFoundException;
+import AssessX_backend.exception.StudentNotInGroupException;
+import AssessX_backend.exception.StudentRoleRequiredException;
+import AssessX_backend.exception.UserNotFoundException;
 import AssessX_backend.model.Group;
 import AssessX_backend.model.User;
 import AssessX_backend.repository.GroupRepository;
 import AssessX_backend.repository.UserRepository;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -36,8 +39,7 @@ public class GroupService {
     @Transactional
     public GroupResponseDto createGroup(CreateGroupRequest request) {
         if (groupRepository.existsByName(request.getName())) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "Group already exists: " + request.getName());
+            throw new GroupAlreadyExistsException(request.getName());
         }
         Group group = new Group();
         group.setName(request.getName());
@@ -56,12 +58,10 @@ public class GroupService {
     public GroupResponseDto addStudentToGroup(Long groupId, Long userId) {
         Group group = findGroupById(groupId);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "User not found: " + userId));
+                .orElseThrow(() -> new UserNotFoundException(userId));
 
         if (user.getRole() != User.Role.STUDENT) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Only students can be added to a group");
+            throw new StudentRoleRequiredException("Only students can be added to a group");
         }
         group.getStudents().add(user);
         return GroupResponseDto.from(groupRepository.save(group));
@@ -72,15 +72,13 @@ public class GroupService {
         Group group = findGroupById(groupId);
         boolean removed = group.getStudents().removeIf(u -> u.getId().equals(userId));
         if (!removed) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, "Student " + userId + " is not in group " + groupId);
+            throw new StudentNotInGroupException(userId, groupId);
         }
         groupRepository.save(group);
     }
 
     private Group findGroupById(Long groupId) {
         return groupRepository.findById(groupId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Group not found: " + groupId));
+                .orElseThrow(() -> new GroupNotFoundException(groupId));
     }
 }

@@ -30,6 +30,8 @@ buildNumber.properties
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
 
+#Some stuff
+curl-testing-guide.md
 scripts/build.sh
 docker-compose.dev.yml
 docker-compose.yml

@@ -6,6 +6,8 @@ import AssessX_backend.dto.TestResponseDto;
 import AssessX_backend.dto.TestSubmitResultDto;
 import AssessX_backend.model.Test;
 import AssessX_backend.model.User;
+import AssessX_backend.exception.TestNotFoundException;
+import AssessX_backend.exception.UserNotFoundException;
 import AssessX_backend.repository.TestRepository;
 import AssessX_backend.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,7 +15,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -92,7 +93,7 @@ class TestServiceTest {
         when(testRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> testService.getTestById(99L, "STUDENT"))
-                .isInstanceOf(ResponseStatusException.class)
+                .isInstanceOf(TestNotFoundException.class)
                 .hasMessageContaining("Test not found");
     }
 
@@ -126,7 +127,7 @@ class TestServiceTest {
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> testService.createTest(req, 99L))
-                .isInstanceOf(ResponseStatusException.class)
+                .isInstanceOf(UserNotFoundException.class)
                 .hasMessageContaining("User not found");
     }
 
@@ -162,7 +163,7 @@ class TestServiceTest {
         when(testRepository.existsById(99L)).thenReturn(false);
 
         assertThatThrownBy(() -> testService.deleteTest(99L))
-                .isInstanceOf(ResponseStatusException.class)
+                .isInstanceOf(TestNotFoundException.class)
                 .hasMessageContaining("Test not found");
     }
 
@@ -216,7 +217,7 @@ class TestServiceTest {
         req.setAnswers(Map.of("1", "A"));
 
         assertThatThrownBy(() -> testService.submitTest(99L, req))
-                .isInstanceOf(ResponseStatusException.class)
+                .isInstanceOf(TestNotFoundException.class)
                 .hasMessageContaining("Test not found");
     }
 }

@@ -3,10 +3,10 @@ package AssessX_backend.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -14,10 +14,10 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ResponseStatusException.class)
-    public ResponseEntity<Map<String, Object>> handleResponseStatus(ResponseStatusException ex) {
-        return ResponseEntity.status(ex.getStatusCode())
-                .body(errorBody(ex.getReason(), ex.getStatusCode().value()));
+    @ExceptionHandler(AppException.class)
+    public ResponseEntity<Map<String, Object>> handleAppException(AppException ex) {
+        return ResponseEntity.status(ex.getStatus())
+                .body(errorBody(ex.getMessage(), ex.getStatus().value()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -27,6 +27,12 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining("; "));
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(errorBody(message, HttpStatus.BAD_REQUEST.value()));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(errorBody("Access denied", HttpStatus.FORBIDDEN.value()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

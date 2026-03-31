@@ -5,6 +5,11 @@ import AssessX_backend.dto.GroupResponseDto;
 import AssessX_backend.dto.UserResponseDto;
 import AssessX_backend.model.Group;
 import AssessX_backend.model.User;
+import AssessX_backend.exception.GroupAlreadyExistsException;
+import AssessX_backend.exception.GroupNotFoundException;
+import AssessX_backend.exception.StudentNotInGroupException;
+import AssessX_backend.exception.StudentRoleRequiredException;
+import AssessX_backend.exception.UserNotFoundException;
 import AssessX_backend.repository.GroupRepository;
 import AssessX_backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,7 +18,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashSet;
 import java.util.List;
@@ -87,7 +91,7 @@ class GroupServiceTest {
         when(groupRepository.existsByName("CS-101")).thenReturn(true);
 
         assertThatThrownBy(() -> groupService.createGroup(req))
-                .isInstanceOf(ResponseStatusException.class)
+                .isInstanceOf(GroupAlreadyExistsException.class)
                 .hasMessageContaining("Group already exists");
     }
 
@@ -107,7 +111,7 @@ class GroupServiceTest {
         when(groupRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> groupService.getStudentsByGroupId(99L))
-                .isInstanceOf(ResponseStatusException.class)
+                .isInstanceOf(GroupNotFoundException.class)
                 .hasMessageContaining("Group not found");
     }
 
@@ -130,7 +134,7 @@ class GroupServiceTest {
         when(userRepository.findById(10L)).thenReturn(Optional.of(student));
 
         assertThatThrownBy(() -> groupService.addStudentToGroup(1L, 10L))
-                .isInstanceOf(ResponseStatusException.class)
+                .isInstanceOf(StudentRoleRequiredException.class)
                 .hasMessageContaining("Only students");
     }
 
@@ -140,7 +144,7 @@ class GroupServiceTest {
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> groupService.addStudentToGroup(1L, 99L))
-                .isInstanceOf(ResponseStatusException.class)
+                .isInstanceOf(UserNotFoundException.class)
                 .hasMessageContaining("User not found");
     }
 
@@ -160,7 +164,7 @@ class GroupServiceTest {
         when(groupRepository.findById(1L)).thenReturn(Optional.of(group));
 
         assertThatThrownBy(() -> groupService.removeStudentFromGroup(1L, 10L))
-                .isInstanceOf(ResponseStatusException.class)
+                .isInstanceOf(StudentNotInGroupException.class)
                 .hasMessageContaining("is not in group");
     }
 }
