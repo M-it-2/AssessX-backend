@@ -8,10 +8,12 @@ import AssessX_backend.exception.AssignmentNotFoundException;
 import AssessX_backend.exception.CodePracticeNotFoundException;
 import AssessX_backend.exception.DeadlineExpiredException;
 import AssessX_backend.exception.InvalidAssignmentException;
+import AssessX_backend.exception.StudentNotInGroupException;
 import AssessX_backend.exception.UserNotFoundException;
 import AssessX_backend.model.Assignment;
 import AssessX_backend.model.CodePractice;
 import AssessX_backend.model.CodeSubmission;
+import AssessX_backend.model.Group;
 import AssessX_backend.model.PracticeUnitTest;
 import AssessX_backend.model.Result;
 import AssessX_backend.model.User;
@@ -21,6 +23,7 @@ import AssessX_backend.repository.CodeSubmissionRepository;
 import AssessX_backend.repository.ResultRepository;
 import AssessX_backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -116,7 +119,7 @@ public class CodePracticeService {
         practiceRepository.deleteById(id);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public CodeSubmissionResultDto submitPractice(Long id, SubmitCodeRequest request, Long userId) {
         CodePractice practice = findPracticeById(id);
         List<String> unitTestCodes = practice.getUnitTests().stream()
@@ -133,6 +136,11 @@ public class CodePracticeService {
             }
             if (assignment.getDeadline() != null && LocalDateTime.now().isAfter(assignment.getDeadline())) {
                 throw new DeadlineExpiredException();
+            }
+            Group group = assignment.getGroup();
+            boolean isMember = group.getStudents().stream().anyMatch(s -> s.getId().equals(userId));
+            if (!isMember) {
+                throw new StudentNotInGroupException(userId, group.getId());
             }
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new UserNotFoundException(userId));

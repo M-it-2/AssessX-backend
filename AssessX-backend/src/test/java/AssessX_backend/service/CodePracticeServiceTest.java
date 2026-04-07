@@ -7,9 +7,11 @@ import AssessX_backend.dto.SubmitCodeRequest;
 import AssessX_backend.exception.CodePracticeNotFoundException;
 import AssessX_backend.exception.DeadlineExpiredException;
 import AssessX_backend.exception.InvalidAssignmentException;
+import AssessX_backend.exception.StudentNotInGroupException;
 import AssessX_backend.exception.UserNotFoundException;
 import AssessX_backend.model.Assignment;
 import AssessX_backend.model.CodePractice;
+import AssessX_backend.model.Group;
 import AssessX_backend.model.PracticeUnitTest;
 import AssessX_backend.model.User;
 import AssessX_backend.repository.AssignmentRepository;
@@ -317,5 +319,33 @@ class CodePracticeServiceTest {
         assertThatThrownBy(() -> practiceService.submitPractice(1L, req, 1L))
                 .isInstanceOf(DeadlineExpiredException.class)
                 .hasMessageContaining("deadline has expired");
+    }
+
+    @Test
+    void submitPractice_studentNotInGroup_throwsStudentNotInGroupException() {
+        CodePractice matchingPractice = new CodePractice();
+        matchingPractice.setId(1L);
+
+        Group group = new Group();
+        group.setId(5L);
+
+        Assignment assignment = new Assignment();
+        assignment.setId(10L);
+        assignment.setPractice(matchingPractice);
+        assignment.setGroup(group);
+
+        when(practiceRepository.findById(1L)).thenReturn(Optional.of(practice));
+        when(codeExecutionService.execute(anyString(), anyList(), anyInt()))
+                .thenReturn(new CodeSubmissionResultDto(1, 1, "RESULT:1/1\n"));
+        when(assignmentRepository.findById(10L)).thenReturn(Optional.of(assignment));
+
+        SubmitCodeRequest req = new SubmitCodeRequest();
+        req.setAssignmentId(10L);
+        req.setCode("public class Solution {}");
+
+        assertThatThrownBy(() -> practiceService.submitPractice(1L, req, 42L))
+                .isInstanceOf(StudentNotInGroupException.class)
+                .hasMessageContaining("42")
+                .hasMessageContaining("5");
     }
 }

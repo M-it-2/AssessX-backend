@@ -6,7 +6,9 @@ import AssessX_backend.dto.TestResponseDto;
 import AssessX_backend.dto.TestSubmitResultDto;
 import AssessX_backend.exception.DeadlineExpiredException;
 import AssessX_backend.exception.InvalidAssignmentException;
+import AssessX_backend.exception.StudentNotInGroupException;
 import AssessX_backend.model.Assignment;
+import AssessX_backend.model.Group;
 import AssessX_backend.model.Test;
 import AssessX_backend.model.User;
 import AssessX_backend.exception.TestNotFoundException;
@@ -274,5 +276,31 @@ class TestServiceTest {
         assertThatThrownBy(() -> testService.submitTest(1L, req, 1L))
                 .isInstanceOf(DeadlineExpiredException.class)
                 .hasMessageContaining("deadline has expired");
+    }
+
+    @org.junit.jupiter.api.Test
+    void submitTest_studentNotInGroup_throwsStudentNotInGroupException() {
+        Test matchingTest = new Test();
+        matchingTest.setId(1L);
+
+        Group group = new Group();
+        group.setId(5L);
+
+        Assignment assignment = new Assignment();
+        assignment.setId(10L);
+        assignment.setTest(matchingTest);
+        assignment.setGroup(group);
+
+        when(testRepository.findById(1L)).thenReturn(Optional.of(test));
+        when(assignmentRepository.findById(10L)).thenReturn(Optional.of(assignment));
+
+        SubmitTestRequest req = new SubmitTestRequest();
+        req.setAssignmentId(10L);
+        req.setAnswers(Map.of("1", "A"));
+
+        assertThatThrownBy(() -> testService.submitTest(1L, req, 42L))
+                .isInstanceOf(StudentNotInGroupException.class)
+                .hasMessageContaining("42")
+                .hasMessageContaining("5");
     }
 }
