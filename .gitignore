@@ -36,3 +36,5 @@ scripts/build.sh
 docker-compose.dev.yml
 docker-compose.yml
 curl-testing-guide.md
+
+.claude/settings.local.json
