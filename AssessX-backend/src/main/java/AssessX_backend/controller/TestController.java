@@ -8,6 +8,7 @@ import AssessX_backend.service.TestService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -35,6 +36,7 @@ public class TestController {
             @PathVariable Long id,
             @AuthenticationPrincipal Jwt jwt) {
         String role = jwt.getClaimAsString("role");
+        if (role == null) throw new AccessDeniedException("Missing required 'role' claim in JWT");
         return ResponseEntity.ok(testService.getTestById(id, role));
     }
 
