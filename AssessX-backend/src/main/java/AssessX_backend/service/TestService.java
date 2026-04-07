@@ -7,10 +7,12 @@ import AssessX_backend.dto.TestSubmitResultDto;
 import AssessX_backend.exception.AssignmentNotFoundException;
 import AssessX_backend.exception.DeadlineExpiredException;
 import AssessX_backend.exception.InvalidAssignmentException;
+import AssessX_backend.exception.StudentNotInGroupException;
 import AssessX_backend.exception.TestAnswersParseException;
 import AssessX_backend.exception.TestNotFoundException;
 import AssessX_backend.exception.UserNotFoundException;
 import AssessX_backend.model.Assignment;
+import AssessX_backend.model.Group;
 import AssessX_backend.model.Result;
 import AssessX_backend.model.Test;
 import AssessX_backend.model.User;
@@ -21,6 +23,7 @@ import AssessX_backend.repository.UserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -95,7 +98,7 @@ public class TestService {
         testRepository.deleteById(id);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public TestSubmitResultDto submitTest(Long id, SubmitTestRequest request, Long userId) {
         Test test = findTestById(id);
         Map<String, String> storedAnswers = parseAnswers(test.getAnswers(), id);
@@ -120,6 +123,11 @@ public class TestService {
             }
             if (assignment.getDeadline() != null && LocalDateTime.now().isAfter(assignment.getDeadline())) {
                 throw new DeadlineExpiredException();
+            }
+            Group group = assignment.getGroup();
+            boolean isMember = group.getStudents().stream().anyMatch(s -> s.getId().equals(userId));
+            if (!isMember) {
+                throw new StudentNotInGroupException(userId, group.getId());
             }
             User user = findUserById(userId);
             int attemptNumber = resultRepository.countByUserIdAndAssignmentId(userId, assignment.getId()) + 1;
