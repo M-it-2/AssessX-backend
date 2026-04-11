@@ -3,7 +3,9 @@ package AssessX_backend.config;
 import AssessX_backend.model.User;
 import AssessX_backend.repository.UserRepository;
 import AssessX_backend.service.JwtTokenProvider;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
+import tools.jackson.databind.ObjectMapper;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.Authentication;
@@ -32,15 +34,15 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                                         HttpServletResponse response,
                                         Authentication authentication) throws IOException {
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
-
         Long githubId = ((Number) oAuth2User.getAttribute("id")).longValue();
         String githubLogin = oAuth2User.getAttribute("login");
         String name = oAuth2User.getAttribute("name");
+
         if (name == null || name.isBlank()) {
             name = githubLogin;
         }
-
         final String finalName = name;
+
         User user = userRepository.findByGithubId(githubId).orElseGet(() -> {
             User newUser = new User();
             newUser.setGithubId(githubId);

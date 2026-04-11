@@ -116,6 +116,20 @@ public class CodePracticeService {
         if (!practiceRepository.existsById(id)) {
             throw new CodePracticeNotFoundException(id);
         }
+        List<Assignment> assignments = assignmentRepository.findByPracticeId(id);
+        for (Assignment a : assignments) {
+            List<Result> results = resultRepository.findByAssignmentId(a.getId());
+            for (Result r : results) {
+                codeSubmissionRepository.deleteByResultId(r.getId());
+            }
+            resultRepository.deleteByAssignmentId(a.getId());
+        }
+        assignmentRepository.deleteAll(assignments);
+        List<Result> practiceResults = resultRepository.findByPracticeId(id);
+        for (Result r : practiceResults) {
+            codeSubmissionRepository.deleteByResultId(r.getId());
+        }
+        resultRepository.deleteByPracticeId(id);
         practiceRepository.deleteById(id);
     }
 

@@ -8,7 +8,9 @@ import AssessX_backend.exception.CodePracticeNotFoundException;
 import AssessX_backend.exception.GlobalExceptionHandler;
 import AssessX_backend.model.CodePractice;
 import AssessX_backend.service.CodePracticeService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
+import tools.jackson.databind.ObjectMapper;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
