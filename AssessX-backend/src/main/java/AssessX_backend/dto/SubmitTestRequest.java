@@ -1,18 +1,14 @@
 package AssessX_backend.dto;
 
-import jakarta.validation.constraints.NotNull;
-import java.util.Map;
+import tools.jackson.databind.JsonNode;
 
 public class SubmitTestRequest {
 
+    private JsonNode answers;
     private Long assignmentId;
 
-    @NotNull
-    private Map<String, String> answers;
-
+    public JsonNode getAnswers() { return answers; }
+    public void setAnswers(JsonNode answers) { this.answers = answers; }
     public Long getAssignmentId() { return assignmentId; }
     public void setAssignmentId(Long assignmentId) { this.assignmentId = assignmentId; }
-
-    public Map<String, String> getAnswers() { return answers; }
-    public void setAnswers(Map<String, String> answers) { this.answers = answers; }
 }

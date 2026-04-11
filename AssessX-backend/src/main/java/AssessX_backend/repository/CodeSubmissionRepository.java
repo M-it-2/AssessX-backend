@@ -8,8 +8,7 @@ import java.util.List;
 
 @Repository
 public interface CodeSubmissionRepository extends JpaRepository<CodeSubmission, Long> {
-
     List<CodeSubmission> findByResultId(Long resultId);
-
     List<CodeSubmission> findByResultIdOrderBySubmittedAtDesc(Long resultId);
+    void deleteByResultId(Long resultId);
 }

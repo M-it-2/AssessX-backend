@@ -9,10 +9,9 @@ import java.util.List;
 
 @Repository
 public interface AssignmentRepository extends JpaRepository<Assignment, Long> {
-
     List<Assignment> findByGroupId(Long groupId);
-
     List<Assignment> findByCreatedById(Long userId);
-
     List<Assignment> findByGroupIdIn(Collection<Long> groupIds);
+    List<Assignment> findByTestId(Long testId);
+    List<Assignment> findByPracticeId(Long practiceId);
 }

@@ -39,25 +39,18 @@ public class Test {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
-
     public String getQuestions() { return questions; }
     public void setQuestions(String questions) { this.questions = questions; }
-
     public String getAnswers() { return answers; }
     public void setAnswers(String answers) { this.answers = answers; }
-
     public Integer getPoints() { return points; }
     public void setPoints(Integer points) { this.points = points; }
-
     public Integer getTimeLimitSec() { return timeLimitSec; }
     public void setTimeLimitSec(Integer timeLimitSec) { this.timeLimitSec = timeLimitSec; }
-
     public User getCreatedBy() { return createdBy; }
     public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }
-
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

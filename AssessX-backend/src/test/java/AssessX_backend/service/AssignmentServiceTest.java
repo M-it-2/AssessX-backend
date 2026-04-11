@@ -2,22 +2,9 @@ package AssessX_backend.service;
 
 import AssessX_backend.dto.AssignmentResponseDto;
 import AssessX_backend.dto.CreateAssignmentRequest;
-import AssessX_backend.exception.AssignmentNotFoundException;
-import AssessX_backend.exception.CodePracticeNotFoundException;
-import AssessX_backend.exception.GroupNotFoundException;
-import AssessX_backend.exception.InvalidAssignmentException;
-import AssessX_backend.exception.TestNotFoundException;
-import AssessX_backend.exception.UserNotFoundException;
-import AssessX_backend.model.Assignment;
-import AssessX_backend.model.CodePractice;
-import AssessX_backend.model.Group;
-import AssessX_backend.model.Test;
-import AssessX_backend.model.User;
-import AssessX_backend.repository.AssignmentRepository;
-import AssessX_backend.repository.CodePracticeRepository;
-import AssessX_backend.repository.GroupRepository;
-import AssessX_backend.repository.TestRepository;
-import AssessX_backend.repository.UserRepository;
+import AssessX_backend.exception.*;
+import AssessX_backend.model.*;
+import AssessX_backend.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -40,9 +27,10 @@ class AssignmentServiceTest {
     @Mock private TestRepository testRepository;
     @Mock private CodePracticeRepository practiceRepository;
     @Mock private UserRepository userRepository;
+    @Mock private ResultRepository resultRepository;
+    @Mock private CodeSubmissionRepository codeSubmissionRepository;
 
     private AssignmentService assignmentService;
-
     private User teacher;
     private User student;
     private Group group;
@@ -53,7 +41,14 @@ class AssignmentServiceTest {
     @BeforeEach
     void setUp() {
         assignmentService = new AssignmentService(
-                assignmentRepository, groupRepository, testRepository, practiceRepository, userRepository);
+            assignmentRepository,
+            groupRepository,
+            testRepository,
+            practiceRepository,
+            userRepository,
+            resultRepository,
+            codeSubmissionRepository
+        );
 
         teacher = new User();
         teacher.setId(1L);
@@ -89,9 +84,7 @@ class AssignmentServiceTest {
     @org.junit.jupiter.api.Test
     void getAllAssignments_returnsList() {
         when(assignmentRepository.findAll()).thenReturn(List.of(assignment));
-
         List<AssignmentResponseDto> result = assignmentService.getAllAssignments();
-
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getId()).isEqualTo(1L);
         assertThat(result.get(0).getGroupId()).isEqualTo(10L);
@@ -101,9 +94,7 @@ class AssignmentServiceTest {
     @org.junit.jupiter.api.Test
     void getAllAssignments_empty_returnsEmptyList() {
         when(assignmentRepository.findAll()).thenReturn(List.of());
-
         List<AssignmentResponseDto> result = assignmentService.getAllAssignments();
-
         assertThat(result).isEmpty();
     }
 
@@ -112,9 +103,7 @@ class AssignmentServiceTest {
         student.setGroups(Set.of(group));
         when(userRepository.findById(2L)).thenReturn(Optional.of(student));
         when(assignmentRepository.findByGroupIdIn(Set.of(10L))).thenReturn(List.of(assignment));
-
         List<AssignmentResponseDto> result = assignmentService.getMyAssignments(2L);
-
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getTestId()).isEqualTo(100L);
     }
@@ -122,9 +111,7 @@ class AssignmentServiceTest {
     @org.junit.jupiter.api.Test
     void getMyAssignments_studentWithNoGroups_returnsEmpty() {
         when(userRepository.findById(2L)).thenReturn(Optional.of(student));
-
         List<AssignmentResponseDto> result = assignmentService.getMyAssignments(2L);
-
         assertThat(result).isEmpty();
         verifyNoInteractions(assignmentRepository);
     }
@@ -132,10 +119,9 @@ class AssignmentServiceTest {
     @org.junit.jupiter.api.Test
     void getMyAssignments_userNotFound_throwsUserNotFoundException() {
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
-
         assertThatThrownBy(() -> assignmentService.getMyAssignments(99L))
-                .isInstanceOf(UserNotFoundException.class)
-                .hasMessageContaining("User not found");
+            .isInstanceOf(UserNotFoundException.class)
+            .hasMessageContaining("User not found");
     }
 
     @org.junit.jupiter.api.Test
@@ -143,18 +129,15 @@ class AssignmentServiceTest {
         CreateAssignmentRequest req = new CreateAssignmentRequest();
         req.setGroupId(10L);
         req.setTestId(100L);
-
         when(groupRepository.findById(10L)).thenReturn(Optional.of(group));
         when(userRepository.findById(1L)).thenReturn(Optional.of(teacher));
         when(testRepository.findById(100L)).thenReturn(Optional.of(test));
         when(assignmentRepository.save(any(Assignment.class))).thenReturn(assignment);
-
         AssignmentResponseDto result = assignmentService.createAssignment(req, 1L);
-
         assertThat(result.getTestId()).isEqualTo(100L);
         assertThat(result.getPracticeId()).isNull();
         verify(assignmentRepository).save(argThat(a ->
-                a.getTest() != null && a.getPractice() == null));
+            a.getTest() != null && a.getPractice() == null));
     }
 
     @org.junit.jupiter.api.Test
@@ -164,22 +147,18 @@ class AssignmentServiceTest {
         practiceAssignment.setGroup(group);
         practiceAssignment.setPractice(practice);
         practiceAssignment.setCreatedBy(teacher);
-
         CreateAssignmentRequest req = new CreateAssignmentRequest();
         req.setGroupId(10L);
         req.setPracticeId(200L);
-
         when(groupRepository.findById(10L)).thenReturn(Optional.of(group));
         when(userRepository.findById(1L)).thenReturn(Optional.of(teacher));
         when(practiceRepository.findById(200L)).thenReturn(Optional.of(practice));
         when(assignmentRepository.save(any(Assignment.class))).thenReturn(practiceAssignment);
-
         AssignmentResponseDto result = assignmentService.createAssignment(req, 1L);
-
         assertThat(result.getPracticeId()).isEqualTo(200L);
         assertThat(result.getTestId()).isNull();
         verify(assignmentRepository).save(argThat(a ->
-                a.getPractice() != null && a.getTest() == null));
+            a.getPractice() != null && a.getTest() == null));
     }
 
     @org.junit.jupiter.api.Test
@@ -188,20 +167,18 @@ class AssignmentServiceTest {
         req.setGroupId(10L);
         req.setTestId(100L);
         req.setPracticeId(200L);
-
         assertThatThrownBy(() -> assignmentService.createAssignment(req, 1L))
-                .isInstanceOf(InvalidAssignmentException.class)
-                .hasMessageContaining("Exactly one");
+            .isInstanceOf(InvalidAssignmentException.class)
+            .hasMessageContaining("Exactly one");
     }
 
     @org.junit.jupiter.api.Test
     void createAssignment_neitherTestNorPractice_throwsInvalidAssignmentException() {
         CreateAssignmentRequest req = new CreateAssignmentRequest();
         req.setGroupId(10L);
-
         assertThatThrownBy(() -> assignmentService.createAssignment(req, 1L))
-                .isInstanceOf(InvalidAssignmentException.class)
-                .hasMessageContaining("Exactly one");
+            .isInstanceOf(InvalidAssignmentException.class)
+            .hasMessageContaining("Exactly one");
     }
 
     @org.junit.jupiter.api.Test
@@ -209,12 +186,10 @@ class AssignmentServiceTest {
         CreateAssignmentRequest req = new CreateAssignmentRequest();
         req.setGroupId(99L);
         req.setTestId(100L);
-
         when(groupRepository.findById(99L)).thenReturn(Optional.empty());
-
         assertThatThrownBy(() -> assignmentService.createAssignment(req, 1L))
-                .isInstanceOf(GroupNotFoundException.class)
-                .hasMessageContaining("Group not found");
+            .isInstanceOf(GroupNotFoundException.class)
+            .hasMessageContaining("Group not found");
     }
 
     @org.junit.jupiter.api.Test
@@ -222,14 +197,12 @@ class AssignmentServiceTest {
         CreateAssignmentRequest req = new CreateAssignmentRequest();
         req.setGroupId(10L);
         req.setTestId(99L);
-
         when(groupRepository.findById(10L)).thenReturn(Optional.of(group));
         when(userRepository.findById(1L)).thenReturn(Optional.of(teacher));
         when(testRepository.findById(99L)).thenReturn(Optional.empty());
-
         assertThatThrownBy(() -> assignmentService.createAssignment(req, 1L))
-                .isInstanceOf(TestNotFoundException.class)
-                .hasMessageContaining("Test not found");
+            .isInstanceOf(TestNotFoundException.class)
+            .hasMessageContaining("Test not found");
     }
 
     @org.junit.jupiter.api.Test
@@ -237,31 +210,33 @@ class AssignmentServiceTest {
         CreateAssignmentRequest req = new CreateAssignmentRequest();
         req.setGroupId(10L);
         req.setPracticeId(99L);
-
         when(groupRepository.findById(10L)).thenReturn(Optional.of(group));
         when(userRepository.findById(1L)).thenReturn(Optional.of(teacher));
         when(practiceRepository.findById(99L)).thenReturn(Optional.empty());
-
         assertThatThrownBy(() -> assignmentService.createAssignment(req, 1L))
-                .isInstanceOf(CodePracticeNotFoundException.class)
-                .hasMessageContaining("Code practice not found");
+            .isInstanceOf(CodePracticeNotFoundException.class)
+            .hasMessageContaining("Code practice not found");
     }
 
     @org.junit.jupiter.api.Test
     void deleteAssignment_success_callsDeleteById() {
         when(assignmentRepository.existsById(1L)).thenReturn(true);
+        when(resultRepository.findByAssignmentId(1L)).thenReturn(List.of());
 
         assignmentService.deleteAssignment(1L);
 
         verify(assignmentRepository).deleteById(1L);
+        verify(resultRepository).deleteByAssignmentId(1L);
+        verify(codeSubmissionRepository, never()).deleteByResultId(any());
     }
+
 
     @org.junit.jupiter.api.Test
     void deleteAssignment_notFound_throwsAssignmentNotFoundException() {
         when(assignmentRepository.existsById(99L)).thenReturn(false);
 
-        assertThatThrownBy(() -> assignmentService.deleteAssignment(99L))
-                .isInstanceOf(AssignmentNotFoundException.class)
-                .hasMessageContaining("Assignment not found");
+        assertThatThrownBy(() ->
+            assignmentService.deleteAssignment(99L)
+        ).isInstanceOf(AssignmentNotFoundException.class);
     }
 }

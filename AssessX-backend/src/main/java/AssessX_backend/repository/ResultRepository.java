@@ -10,14 +10,14 @@ import java.util.List;
 
 @Repository
 public interface ResultRepository extends JpaRepository<Result, Long> {
-
     List<Result> findByUserId(Long userId);
-
     int countByUserIdAndAssignmentId(Long userId, Long assignmentId);
-
     List<Result> findByTestId(Long testId);
-
     List<Result> findByPracticeId(Long practiceId);
+    void deleteByAssignmentId(Long assignmentId);
+    void deleteByTestId(Long testId);
+    void deleteByPracticeId(Long practiceId);
+    List<Result> findByAssignmentId(Long assignmentId);
 
     @Query("""
         SELECT r FROM Result r
