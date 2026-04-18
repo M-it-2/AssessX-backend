@@ -111,7 +111,7 @@ public class TestService {
 
         int correct = 0;
         for (int i = 0; i < total; i++) {
-            int correctOptionIndex = correctAnswers.get(i).asInt();
+            int correctOptionIndex = correctAnswers.get(String.valueOf(i)).asInt();
             String userAnswer = userAnswers.has(String.valueOf(i))
                 ? userAnswers.get(String.valueOf(i)).asText()
                 : "";

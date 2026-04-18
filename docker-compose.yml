@@ -1,10 +1,13 @@
 services:
   backend:
+    restart: always
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       DB_URL: ${DB_URL}
       DB_PORT: ${DB_PORT}
