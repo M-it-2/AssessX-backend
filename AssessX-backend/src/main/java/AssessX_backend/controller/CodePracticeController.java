@@ -3,8 +3,11 @@ package AssessX_backend.controller;
 import AssessX_backend.dto.CodePracticeResponseDto;
 import AssessX_backend.dto.CodeSubmissionResultDto;
 import AssessX_backend.dto.CreateCodePracticeRequest;
+import AssessX_backend.dto.HintRequest;
+import AssessX_backend.dto.HintResponseDto;
 import AssessX_backend.dto.SubmitCodeRequest;
 import AssessX_backend.service.CodePracticeService;
+import AssessX_backend.service.HintService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,9 +23,11 @@ import java.util.List;
 public class CodePracticeController {
 
     private final CodePracticeService practiceService;
+    private final HintService hintService;
 
-    public CodePracticeController(CodePracticeService practiceService) {
+    public CodePracticeController(CodePracticeService practiceService, HintService hintService) {
         this.practiceService = practiceService;
+        this.hintService = hintService;
     }
 
     @GetMapping
@@ -57,6 +62,15 @@ public class CodePracticeController {
     public ResponseEntity<Void> deletePractice(@PathVariable Long id) {
         practiceService.deletePractice(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/hint")
+    public ResponseEntity<HintResponseDto> requestHint(
+            @PathVariable Long id,
+            @Valid @RequestBody HintRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long userId = Long.parseLong(jwt.getSubject());
+        return ResponseEntity.ok(hintService.requestHint(id, request.getAssignmentId(), request.getCurrentCode(), userId));
     }
 
     @PostMapping("/{id}/submit")

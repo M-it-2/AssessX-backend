@@ -102,7 +102,6 @@ public class TestService {
 
         JsonNode correctAnswers = fromJson(test.getAnswers());
         JsonNode userAnswers = request.getAnswers();
-        JsonNode questionsNode = fromJson(test.getQuestions());
 
         int total = correctAnswers.size();
         if (total == 0) {
@@ -110,14 +109,12 @@ public class TestService {
         }
 
         int correct = 0;
-        for (int i = 0; i < total; i++) {
-            int correctOptionIndex = correctAnswers.get(i).asInt();
-            String userAnswer = userAnswers.has(String.valueOf(i))
-                ? userAnswers.get(String.valueOf(i)).asText()
+        for (String qId : correctAnswers.propertyNames()) {
+            String correctAnswer = correctAnswers.get(qId).asText();
+            String userAnswer = userAnswers != null && userAnswers.has(qId)
+                ? userAnswers.get(qId).asText()
                 : "";
-            String correctOptionText = questionsNode.get(i)
-                .get("options").get(correctOptionIndex).asText();
-            if (correctOptionText.equals(userAnswer)) {
+            if (correctAnswer.equals(userAnswer)) {
                 correct++;
             }
         }
@@ -138,16 +135,17 @@ public class TestService {
                 throw new DeadlineExpiredException();
             }
 
-            Group group = assignment.getGroup();
-            boolean isMember = group.getStudents()
-                .stream()
-                .anyMatch(s -> s.getId().equals(userId));
-
-            if (!isMember) {
-                throw new StudentNotInGroupException(userId, group.getId());
-            }
-
             User user = findUserById(userId);
+
+            if (user.getRole() == User.Role.STUDENT) {
+                Group group = assignment.getGroup();
+                boolean isMember = group.getStudents()
+                    .stream()
+                    .anyMatch(s -> s.getId().equals(userId));
+                if (!isMember) {
+                    throw new StudentNotInGroupException(userId, group.getId());
+                }
+            }
 
             int attemptNumber =
                 resultRepository.countByUserIdAndAssignmentId(userId, assignment.getId()) + 1;
@@ -170,6 +168,9 @@ public class TestService {
     private String toJson(Object value) {
         if (value == null) return null;
         try {
+            if (value instanceof JsonNode node && node.isTextual()) {
+                return node.asText();
+            }
             return objectMapper.writeValueAsString(value);
         } catch (Exception e) {
             throw new RuntimeException("Failed to serialize to JSON", e);

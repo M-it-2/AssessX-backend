@@ -22,6 +22,7 @@ public class AssignmentService {
     private final UserRepository userRepository;
     private final ResultRepository resultRepository;
     private final CodeSubmissionRepository codeSubmissionRepository;
+    private final PracticeHintRepository practiceHintRepository;
 
     public AssignmentService(
         AssignmentRepository assignmentRepository,
@@ -30,7 +31,8 @@ public class AssignmentService {
         CodePracticeRepository practiceRepository,
         UserRepository userRepository,
         ResultRepository resultRepository,
-        CodeSubmissionRepository codeSubmissionRepository
+        CodeSubmissionRepository codeSubmissionRepository,
+        PracticeHintRepository practiceHintRepository
     ) {
         this.assignmentRepository = assignmentRepository;
         this.groupRepository = groupRepository;
@@ -39,6 +41,7 @@ public class AssignmentService {
         this.userRepository = userRepository;
         this.resultRepository = resultRepository;
         this.codeSubmissionRepository = codeSubmissionRepository;
+        this.practiceHintRepository = practiceHintRepository;
     }
 
     @Transactional(readOnly = true)
@@ -106,6 +109,8 @@ public class AssignmentService {
         if (!assignmentRepository.existsById(id)) {
             throw new AssignmentNotFoundException(id);
         }
+
+        practiceHintRepository.deleteByAssignmentId(id);
 
         List<Result> results = resultRepository.findByAssignmentId(id);
 

@@ -33,6 +33,13 @@ public class GroupController {
         return ResponseEntity.status(HttpStatus.CREATED).body(groupService.createGroup(request));
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<Void> deleteGroup(@PathVariable Long id) {
+        groupService.deleteGroup(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}/students")
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<List<UserResponseDto>> getStudents(@PathVariable Long id) {

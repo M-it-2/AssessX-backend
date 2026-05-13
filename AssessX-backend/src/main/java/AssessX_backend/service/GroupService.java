@@ -77,6 +77,12 @@ public class GroupService {
         groupRepository.save(group);
     }
 
+    @Transactional
+    public void deleteGroup(Long groupId) {
+        Group group = findGroupById(groupId);
+        groupRepository.delete(group);
+    }
+
     private Group findGroupById(Long groupId) {
         return groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException(groupId));

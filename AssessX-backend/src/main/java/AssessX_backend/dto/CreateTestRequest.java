@@ -1,12 +1,24 @@
 package AssessX_backend.dto;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import tools.jackson.databind.JsonNode;
 
 public class CreateTestRequest {
+
+    @NotBlank
     private String title;
+
     private JsonNode questions;
     private JsonNode answers;
+
+    @NotNull
+    @Min(1)
     private Integer points;
+
+    @NotNull
+    @Min(1)
     private Integer timeLimitSec;
 
     public String getTitle() {

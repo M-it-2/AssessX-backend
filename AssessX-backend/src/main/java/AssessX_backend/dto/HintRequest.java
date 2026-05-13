@@ -1,16 +1,17 @@
 package AssessX_backend.dto;
 
 import jakarta.validation.constraints.NotNull;
-import tools.jackson.databind.JsonNode;
 
-public class SubmitTestRequest {
+public class HintRequest {
 
     @NotNull
-    private JsonNode answers;
     private Long assignmentId;
 
-    public JsonNode getAnswers() { return answers; }
-    public void setAnswers(JsonNode answers) { this.answers = answers; }
+    private String currentCode;
+
     public Long getAssignmentId() { return assignmentId; }
     public void setAssignmentId(Long assignmentId) { this.assignmentId = assignmentId; }
+
+    public String getCurrentCode() { return currentCode; }
+    public void setCurrentCode(String currentCode) { this.currentCode = currentCode; }
 }
