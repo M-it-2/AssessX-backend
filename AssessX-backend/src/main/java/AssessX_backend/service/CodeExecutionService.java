@@ -33,22 +33,26 @@ public class CodeExecutionService {
 
         try {
             Files.createDirectories(taskDir);
+            System.out.println("[Sandbox] Created dir: " + taskDir);
+
             Files.writeString(taskDir.resolve("Solution.java"), studentCode);
             Files.writeString(taskDir.resolve("Runner.java"), buildRunner(unitTestCodes));
+            System.out.println("[Sandbox] Files written");
 
             String[] cmd = {
                 "docker", "run", "--rm",
                 "--network", "none",
                 "--memory", "128m",
                 "--cpus", "0.5",
-                "--mount", "type=volume,source=" + sandboxVolume + ",target=" + sandboxPath,
                 "eclipse-temurin:21-jdk-alpine",
                 "sh", "-c",
-                "cd " + sandboxPath + "/" + taskId +
-                " && javac Solution.java Runner.java 2>&1" +
-                " && java -ea Runner 2>&1"
+                "mkdir -p /tmp/task && " +
+                "cat > /tmp/task/Solution.java << 'JAVAEOF'\n" + studentCode + "\nJAVAEOF\n" +
+                "cat > /tmp/task/Runner.java << 'JAVAEOF'\n" + buildRunner(unitTestCodes) + "\nJAVAEOF\n" +
+                "cd /tmp/task && javac Solution.java Runner.java 2>&1 && java -ea Runner 2>&1"
             };
 
+            System.out.println("[Sandbox] Running docker command");
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.redirectErrorStream(true);
             Process process = pb.start();
@@ -61,19 +65,23 @@ public class CodeExecutionService {
                 }
             }
 
-            boolean finished = process.waitFor(timeLimitSec + 5L, TimeUnit.SECONDS);
+            boolean finished = process.waitFor(timeLimitSec + 10L, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
+                deleteDir(taskDir.toFile());
                 return new CodeSubmissionResultDto(0, total, "Execution timed out");
             }
 
             String outputStr = output.toString();
+            deleteDir(taskDir.toFile());
             return new CodeSubmissionResultDto(parsePassedCount(outputStr), total, outputStr);
 
         } catch (Exception e) {
-            return new CodeSubmissionResultDto(0, total, "Execution error: " + e.getMessage());
-        } finally {
+            System.err.println("[Sandbox] Error: " + e.getMessage());
+            e.printStackTrace();
+            
             deleteDir(taskDir.toFile());
+            return new CodeSubmissionResultDto(0, total, "Execution error: " + e.getMessage());
         }
     }
 
