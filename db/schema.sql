@@ -92,8 +92,20 @@ CREATE TABLE code_submissions (
     CONSTRAINT valid_test_counts CHECK (passed_tests <= total_tests)
 );
 
+CREATE TABLE practice_hints (
+    id            BIGSERIAL PRIMARY KEY,
+    user_id       BIGINT NOT NULL REFERENCES users(id)          ON DELETE CASCADE,
+    practice_id   BIGINT NOT NULL REFERENCES code_practices(id) ON DELETE CASCADE,
+    assignment_id BIGINT NOT NULL REFERENCES assignments(id)    ON DELETE CASCADE,
+    hint_text     TEXT   NOT NULL,
+    created_at    TIMESTAMP DEFAULT NOW(),
+    UNIQUE (user_id, assignment_id)
+);
+
 CREATE INDEX idx_results_user        ON results(user_id);
 CREATE INDEX idx_results_assignment  ON results(assignment_id);
 CREATE INDEX idx_assignments_group   ON assignments(group_id);
 CREATE INDEX idx_user_groups_group   ON user_groups(group_id);
 CREATE INDEX idx_submissions_result  ON code_submissions(result_id);
+CREATE INDEX idx_hints_user          ON practice_hints(user_id);
+CREATE INDEX idx_hints_assignment    ON practice_hints(assignment_id);

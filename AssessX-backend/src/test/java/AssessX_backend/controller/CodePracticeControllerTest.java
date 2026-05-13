@@ -3,11 +3,16 @@ package AssessX_backend.controller;
 import AssessX_backend.dto.CodePracticeResponseDto;
 import AssessX_backend.dto.CodeSubmissionResultDto;
 import AssessX_backend.dto.CreateCodePracticeRequest;
+import AssessX_backend.dto.HintRequest;
+import AssessX_backend.dto.HintResponseDto;
 import AssessX_backend.dto.SubmitCodeRequest;
 import AssessX_backend.exception.CodePracticeNotFoundException;
 import AssessX_backend.exception.GlobalExceptionHandler;
+import AssessX_backend.exception.HintAlreadyUsedException;
+import AssessX_backend.exception.OllamaUnavailableException;
 import AssessX_backend.model.CodePractice;
 import AssessX_backend.service.CodePracticeService;
+import AssessX_backend.service.HintService;
 
 import tools.jackson.databind.ObjectMapper;
 
@@ -36,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CodePracticeControllerTest {
 
     @Mock CodePracticeService practiceService;
+    @Mock HintService hintService;
 
     MockMvc mockMvc;
     ObjectMapper objectMapper = new ObjectMapper();
@@ -45,7 +51,7 @@ class CodePracticeControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new CodePracticeController(practiceService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new CodePracticeController(practiceService, hintService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
@@ -231,5 +237,67 @@ class CodePracticeControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
+    }
+
+    @org.junit.jupiter.api.Test
+    void requestHint_validRequest_returns200WithHint() throws Exception {
+        authenticateAs("1");
+        HintRequest req = new HintRequest();
+        req.setAssignmentId(5L);
+        req.setCurrentCode("public class Solution {}");
+
+        HintResponseDto dto = new HintResponseDto("Think about the + operator.", java.time.LocalDateTime.now());
+        when(hintService.requestHint(eq(1L), eq(5L), eq("public class Solution {}"), eq(1L))).thenReturn(dto);
+
+        mockMvc.perform(post("/api/practices/1/hint")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hint").value("Think about the + operator."))
+                .andExpect(jsonPath("$.hintUsedAt").exists());
+    }
+
+    @org.junit.jupiter.api.Test
+    void requestHint_missingAssignmentId_returns400() throws Exception {
+        authenticateAs("1");
+        String body = "{\"currentCode\":\"public class Solution {}\"}";
+
+        mockMvc.perform(post("/api/practices/1/hint")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists());
+    }
+
+    @org.junit.jupiter.api.Test
+    void requestHint_alreadyUsed_returns409() throws Exception {
+        authenticateAs("1");
+        HintRequest req = new HintRequest();
+        req.setAssignmentId(5L);
+
+        when(hintService.requestHint(eq(1L), eq(5L), isNull(), eq(1L)))
+                .thenThrow(new HintAlreadyUsedException(5L));
+
+        mockMvc.perform(post("/api/practices/1/hint")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+    }
+
+    @org.junit.jupiter.api.Test
+    void requestHint_ollamaUnavailable_returns503() throws Exception {
+        authenticateAs("1");
+        HintRequest req = new HintRequest();
+        req.setAssignmentId(5L);
+
+        when(hintService.requestHint(eq(1L), eq(5L), isNull(), eq(1L)))
+                .thenThrow(new OllamaUnavailableException());
+
+        mockMvc.perform(post("/api/practices/1/hint")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value(503));
     }
 }

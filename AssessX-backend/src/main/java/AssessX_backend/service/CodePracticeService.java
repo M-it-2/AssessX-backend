@@ -20,6 +20,7 @@ import AssessX_backend.model.User;
 import AssessX_backend.repository.AssignmentRepository;
 import AssessX_backend.repository.CodePracticeRepository;
 import AssessX_backend.repository.CodeSubmissionRepository;
+import AssessX_backend.repository.PracticeHintRepository;
 import AssessX_backend.repository.ResultRepository;
 import AssessX_backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -39,19 +40,22 @@ public class CodePracticeService {
     private final AssignmentRepository assignmentRepository;
     private final ResultRepository resultRepository;
     private final CodeSubmissionRepository codeSubmissionRepository;
+    private final PracticeHintRepository practiceHintRepository;
 
     public CodePracticeService(CodePracticeRepository practiceRepository,
                                UserRepository userRepository,
                                CodeExecutionService codeExecutionService,
                                AssignmentRepository assignmentRepository,
                                ResultRepository resultRepository,
-                               CodeSubmissionRepository codeSubmissionRepository) {
+                               CodeSubmissionRepository codeSubmissionRepository,
+                               PracticeHintRepository practiceHintRepository) {
         this.practiceRepository = practiceRepository;
         this.userRepository = userRepository;
         this.codeExecutionService = codeExecutionService;
         this.assignmentRepository = assignmentRepository;
         this.resultRepository = resultRepository;
         this.codeSubmissionRepository = codeSubmissionRepository;
+        this.practiceHintRepository = practiceHintRepository;
     }
 
     @Transactional(readOnly = true)
@@ -151,25 +155,30 @@ public class CodePracticeService {
             if (assignment.getDeadline() != null && LocalDateTime.now().isAfter(assignment.getDeadline())) {
                 throw new DeadlineExpiredException();
             }
-            Group group = assignment.getGroup();
-            boolean isMember = group.getStudents().stream().anyMatch(s -> s.getId().equals(userId));
-            if (!isMember) {
-                throw new StudentNotInGroupException(userId, group.getId());
-            }
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new UserNotFoundException(userId));
+
+            if (user.getRole() == User.Role.STUDENT) {
+                Group group = assignment.getGroup();
+                boolean isMember = group.getStudents().stream().anyMatch(s -> s.getId().equals(userId));
+                if (!isMember) {
+                    throw new StudentNotInGroupException(userId, group.getId());
+                }
+            }
             int attemptNumber = resultRepository.countByUserIdAndAssignmentId(userId, assignment.getId()) + 1;
 
             int total = executionResult.getTotalTests();
             int passed = executionResult.getPassedTests();
-            int earned = total > 0 ? (int) Math.round((double) passed / total * practice.getPoints()) : 0;
+            boolean hintUsed = practiceHintRepository.existsByUserIdAndAssignmentId(userId, assignment.getId());
+            int maxPoints = hintUsed ? practice.getPoints() / 2 : practice.getPoints();
+            int earned = total > 0 ? (int) Math.round((double) passed / total * maxPoints) : 0;
 
             Result result = new Result();
             result.setUser(user);
             result.setAssignment(assignment);
             result.setPractice(practice);
             result.setPoints(earned);
-            result.setMaxPoints(practice.getPoints());
+            result.setMaxPoints(maxPoints);
             result.setAttemptNumber(attemptNumber);
             result.setSubmittedAt(LocalDateTime.now());
             Result savedResult = resultRepository.save(result);

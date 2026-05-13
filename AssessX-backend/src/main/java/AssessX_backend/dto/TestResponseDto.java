@@ -14,9 +14,9 @@ public class TestResponseDto {
         TestResponseDto dto = new TestResponseDto();
         dto.setId(test.getId());
         dto.setTitle(test.getTitle());
-        dto.setQuestions(test.getQuestions().toString());
+        dto.setQuestions(test.getQuestions());
         if (includeAnswers) {
-            dto.setAnswers(test.getAnswers().toString());
+            dto.setAnswers(test.getAnswers());
         } else {
             dto.setAnswers(null);
         }

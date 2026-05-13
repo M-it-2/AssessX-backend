@@ -17,6 +17,7 @@ import AssessX_backend.model.User;
 import AssessX_backend.repository.AssignmentRepository;
 import AssessX_backend.repository.CodePracticeRepository;
 import AssessX_backend.repository.CodeSubmissionRepository;
+import AssessX_backend.repository.PracticeHintRepository;
 import AssessX_backend.repository.ResultRepository;
 import AssessX_backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +44,7 @@ class CodePracticeServiceTest {
     @Mock private AssignmentRepository assignmentRepository;
     @Mock private ResultRepository resultRepository;
     @Mock private CodeSubmissionRepository codeSubmissionRepository;
+    @Mock private PracticeHintRepository practiceHintRepository;
 
     private CodePracticeService practiceService;
 
@@ -52,7 +54,7 @@ class CodePracticeServiceTest {
     @BeforeEach
     void setUp() {
         practiceService = new CodePracticeService(practiceRepository, userRepository, codeExecutionService,
-                assignmentRepository, resultRepository, codeSubmissionRepository);
+                assignmentRepository, resultRepository, codeSubmissionRepository, practiceHintRepository);
 
         teacher = new User();
         teacher.setId(1L);
@@ -322,6 +324,47 @@ class CodePracticeServiceTest {
     }
 
     @Test
+    void submitPractice_hintUsed_capsMaxPointsToHalf() {
+        CodePractice matchingPractice = new CodePractice();
+        matchingPractice.setId(1L);
+        matchingPractice.setPoints(100);
+        matchingPractice.setTimeLimitSec(30);
+
+        PracticeUnitTest unitTest = new PracticeUnitTest();
+        unitTest.setTestCode("assert true;");
+        unitTest.setPractice(matchingPractice);
+        matchingPractice.getUnitTests().add(unitTest);
+
+        Group group = new Group();
+        group.setId(5L);
+        User student = new User();
+        student.setId(2L);
+        group.getStudents().add(student);
+
+        Assignment assignment = new Assignment();
+        assignment.setId(10L);
+        assignment.setPractice(matchingPractice);
+        assignment.setGroup(group);
+
+        when(practiceRepository.findById(1L)).thenReturn(Optional.of(matchingPractice));
+        when(codeExecutionService.execute(anyString(), anyList(), anyInt()))
+                .thenReturn(new CodeSubmissionResultDto(1, 1, "RESULT:1/1\n"));
+        when(assignmentRepository.findById(10L)).thenReturn(Optional.of(assignment));
+        when(practiceHintRepository.existsByUserIdAndAssignmentId(2L, 10L)).thenReturn(true);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(student));
+        when(resultRepository.countByUserIdAndAssignmentId(2L, 10L)).thenReturn(0);
+        when(resultRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SubmitCodeRequest req = new SubmitCodeRequest();
+        req.setAssignmentId(10L);
+        req.setCode("public class Solution {}");
+
+        practiceService.submitPractice(1L, req, 2L);
+
+        verify(resultRepository).save(argThat(r -> r.getMaxPoints() == 50 && r.getPoints() == 50));
+    }
+
+    @Test
     void submitPractice_studentNotInGroup_throwsStudentNotInGroupException() {
         CodePractice matchingPractice = new CodePractice();
         matchingPractice.setId(1L);
@@ -334,10 +377,15 @@ class CodePracticeServiceTest {
         assignment.setPractice(matchingPractice);
         assignment.setGroup(group);
 
+        User student = new User();
+        student.setId(42L);
+        student.setRole(User.Role.STUDENT);
+
         when(practiceRepository.findById(1L)).thenReturn(Optional.of(practice));
         when(codeExecutionService.execute(anyString(), anyList(), anyInt()))
                 .thenReturn(new CodeSubmissionResultDto(1, 1, "RESULT:1/1\n"));
         when(assignmentRepository.findById(10L)).thenReturn(Optional.of(assignment));
+        when(userRepository.findById(42L)).thenReturn(Optional.of(student));
 
         SubmitCodeRequest req = new SubmitCodeRequest();
         req.setAssignmentId(10L);

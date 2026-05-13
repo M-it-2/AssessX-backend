@@ -29,6 +29,7 @@ class AssignmentServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private ResultRepository resultRepository;
     @Mock private CodeSubmissionRepository codeSubmissionRepository;
+    @Mock private PracticeHintRepository practiceHintRepository;
 
     private AssignmentService assignmentService;
     private User teacher;
@@ -47,7 +48,8 @@ class AssignmentServiceTest {
             practiceRepository,
             userRepository,
             resultRepository,
-            codeSubmissionRepository
+            codeSubmissionRepository,
+            practiceHintRepository
         );
 
         teacher = new User();

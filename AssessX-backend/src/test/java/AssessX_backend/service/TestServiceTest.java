@@ -271,8 +271,13 @@ class TestServiceTest {
         assignment.setTest(test);
         assignment.setGroup(group);
 
+        User student = new User();
+        student.setId(42L);
+        student.setRole(User.Role.STUDENT);
+
         when(testRepository.findById(1L)).thenReturn(Optional.of(test));
         when(assignmentRepository.findById(10L)).thenReturn(Optional.of(assignment));
+        when(userRepository.findById(42L)).thenReturn(Optional.of(student));
 
         SubmitTestRequest r = req(answers("A", "B", "C"));
         r.setAssignmentId(10L);
