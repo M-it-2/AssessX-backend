@@ -3,9 +3,11 @@ package AssessX_backend.service;
 import AssessX_backend.dto.CodePracticeResponseDto;
 import AssessX_backend.dto.CodeSubmissionResultDto;
 import AssessX_backend.dto.CreateCodePracticeRequest;
+import AssessX_backend.dto.CsvImportResultDto;
 import AssessX_backend.dto.SubmitCodeRequest;
 import AssessX_backend.exception.AssignmentNotFoundException;
 import AssessX_backend.exception.CodePracticeNotFoundException;
+import AssessX_backend.exception.CsvImportException;
 import AssessX_backend.exception.DeadlineExpiredException;
 import AssessX_backend.exception.InvalidAssignmentException;
 import AssessX_backend.exception.StudentNotInGroupException;
@@ -23,16 +25,32 @@ import AssessX_backend.repository.CodeSubmissionRepository;
 import AssessX_backend.repository.PracticeHintRepository;
 import AssessX_backend.repository.ResultRepository;
 import AssessX_backend.repository.UserRepository;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 public class CodePracticeService {
+
+    private static final Logger log = LoggerFactory.getLogger(CodePracticeService.class);
 
     private final CodePracticeRepository practiceRepository;
     private final UserRepository userRepository;
@@ -193,6 +211,102 @@ public class CodePracticeService {
         }
 
         return executionResult;
+    }
+
+    @Transactional
+    public CsvImportResultDto importFromCsv(MultipartFile file, Long userId) {
+        User creator = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        int createdPractices = 0;
+        int addedTests = 0;
+        List<String> failedRows = new ArrayList<>();
+
+        Map<String, List<String>> testCodesByTask = new LinkedHashMap<>();
+        Map<String, String> taskDescriptions = new LinkedHashMap<>();
+        Map<String, Integer> taskMaxScores = new LinkedHashMap<>();
+
+        CSVFormat format = CSVFormat.DEFAULT.builder()
+                .setHeader()
+                .setSkipHeaderRecord(true)
+                .build();
+
+        try (Reader reader = new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8);
+             CSVParser parser = CSVParser.parse(reader, format)) {
+
+            for (CSVRecord record : parser) {
+                String rowLabel = "Row " + record.getRecordNumber();
+                try {
+                    String taskName = record.get("task_name").trim();
+                    String taskDescription = record.get("task_description").trim();
+                    String maxScoreStr = record.get("max_score").trim();
+                    String testCode = record.get("test_code").trim();
+
+                    if (taskName.isEmpty() || taskDescription.isEmpty() || testCode.isEmpty()) {
+                        failedRows.add(rowLabel + ": required fields are empty");
+                        continue;
+                    }
+
+                    int maxScore;
+                    try {
+                        maxScore = Integer.parseInt(maxScoreStr);
+                    } catch (NumberFormatException e) {
+                        failedRows.add(rowLabel + ": invalid max_score '" + maxScoreStr + "'");
+                        continue;
+                    }
+
+                    if (maxScore <= 0) {
+                        failedRows.add(rowLabel + ": max_score must be > 0");
+                        continue;
+                    }
+
+                    if (!testCodesByTask.containsKey(taskName)) {
+                        testCodesByTask.put(taskName, new ArrayList<>());
+                        taskDescriptions.put(taskName, taskDescription);
+                        taskMaxScores.put(taskName, maxScore);
+                    }
+                    testCodesByTask.get(taskName).add(testCode);
+
+                } catch (Exception e) {
+                    failedRows.add(rowLabel + ": " + e.getMessage());
+                }
+            }
+        } catch (IOException e) {
+            throw new CsvImportException("Failed to read CSV file: " + e.getMessage());
+        }
+
+        for (String taskName : testCodesByTask.keySet()) {
+            List<String> testCodes = testCodesByTask.get(taskName);
+            Optional<CodePractice> existing = practiceRepository.findByTitle(taskName);
+            CodePractice practice;
+
+            if (existing.isPresent()) {
+                practice = existing.get();
+            } else {
+                practice = new CodePractice();
+                practice.setTitle(taskName);
+                practice.setDescription(taskDescriptions.get(taskName));
+                practice.setPoints(taskMaxScores.get(taskName));
+                practice.setTimeLimitSec(30);
+                practice.setCreatedBy(creator);
+                createdPractices++;
+            }
+
+            for (String testCode : testCodes) {
+                PracticeUnitTest unitTest = new PracticeUnitTest();
+                unitTest.setTestCode(testCode);
+                unitTest.setPractice(practice);
+                practice.getUnitTests().add(unitTest);
+                addedTests++;
+            }
+
+            practiceRepository.save(practice);
+        }
+
+        log.info("CSV import by user {}: created {} practices, added {} tests, {} failed rows",
+                userId, createdPractices, addedTests, failedRows.size());
+
+        return new CsvImportResultDto(createdPractices, addedTests, failedRows);
     }
 
     private CodePractice findPracticeById(Long id) {
