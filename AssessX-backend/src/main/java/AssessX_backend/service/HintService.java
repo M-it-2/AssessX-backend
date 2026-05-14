@@ -54,12 +54,12 @@ public class HintService {
 
     @Transactional
     public HintResponseDto requestHint(Long practiceId, Long assignmentId, String currentCode, Long userId) {
-        CodePractice practice = practiceRepository.findById(practiceId)
-                .orElseThrow(() -> new CodePracticeNotFoundException(practiceId));
-
         if (practiceHintRepository.existsByUserIdAndAssignmentId(userId, assignmentId)) {
             throw new HintAlreadyUsedException(assignmentId);
         }
+
+        CodePractice practice = practiceRepository.findById(practiceId)
+                .orElseThrow(() -> new CodePracticeNotFoundException(practiceId));
 
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new AssignmentNotFoundException(assignmentId));
