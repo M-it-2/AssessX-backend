@@ -4,6 +4,7 @@ import AssessX_backend.dto.CodePracticeResponseDto;
 import AssessX_backend.dto.CodeSubmissionResultDto;
 import AssessX_backend.dto.CreateCodePracticeRequest;
 import AssessX_backend.dto.CsvImportResultDto;
+import AssessX_backend.dto.RunCodeResultDto;
 import AssessX_backend.dto.SubmitCodeRequest;
 import AssessX_backend.exception.AssignmentNotFoundException;
 import AssessX_backend.exception.CodePracticeNotFoundException;
@@ -211,6 +212,15 @@ public class CodePracticeService {
         }
 
         return executionResult;
+    }
+
+    @Transactional(readOnly = true)
+    public RunCodeResultDto runCode(Long practiceId, String code) {
+        CodePractice practice = findPracticeById(practiceId);
+        List<String> unitTestCodes = practice.getUnitTests().stream()
+                .map(PracticeUnitTest::getTestCode)
+                .collect(Collectors.toList());
+        return codeExecutionService.executeWithDetails(code, unitTestCodes, practice.getTimeLimitSec());
     }
 
     @Transactional

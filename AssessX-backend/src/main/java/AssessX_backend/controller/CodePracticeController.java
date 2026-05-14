@@ -6,6 +6,8 @@ import AssessX_backend.dto.CreateCodePracticeRequest;
 import AssessX_backend.dto.CsvImportResultDto;
 import AssessX_backend.dto.HintRequest;
 import AssessX_backend.dto.HintResponseDto;
+import AssessX_backend.dto.RunCodeRequest;
+import AssessX_backend.dto.RunCodeResultDto;
 import AssessX_backend.dto.SubmitCodeRequest;
 import AssessX_backend.exception.CsvImportException;
 import AssessX_backend.service.CodePracticeService;
@@ -86,6 +88,13 @@ public class CodePracticeController {
             @AuthenticationPrincipal Jwt jwt) {
         Long userId = Long.parseLong(jwt.getSubject());
         return ResponseEntity.ok(hintService.requestHint(id, request.getAssignmentId(), request.getCurrentCode(), userId));
+    }
+
+    @PostMapping("/{id}/run")
+    public ResponseEntity<RunCodeResultDto> runCode(
+            @PathVariable Long id,
+            @Valid @RequestBody RunCodeRequest request) {
+        return ResponseEntity.ok(practiceService.runCode(id, request.getCode()));
     }
 
     @PostMapping("/{id}/submit")
