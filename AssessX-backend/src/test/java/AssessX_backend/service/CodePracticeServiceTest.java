@@ -4,6 +4,8 @@ import AssessX_backend.dto.CodePracticeResponseDto;
 import AssessX_backend.dto.CodeSubmissionResultDto;
 import AssessX_backend.dto.CreateCodePracticeRequest;
 import AssessX_backend.dto.CsvImportResultDto;
+import AssessX_backend.dto.RunCodeResultDto;
+import AssessX_backend.dto.RunCodeResultDto.TestRunResult;
 import AssessX_backend.dto.SubmitCodeRequest;
 import AssessX_backend.exception.CodePracticeNotFoundException;
 import AssessX_backend.exception.DeadlineExpiredException;
@@ -424,6 +426,67 @@ class CodePracticeServiceTest {
         assertThat(result.getAddedTests()).isEqualTo(1);
         assertThat(result.getFailedRows()).hasSize(1);
         assertThat(result.getFailedRows().get(0)).contains("required fields are empty");
+    }
+
+    @Test
+    void runCode_allTestsPass_returnsCompiledTrueAllPassed() {
+        when(practiceRepository.findById(1L)).thenReturn(Optional.of(practice));
+        RunCodeResultDto expected = new RunCodeResultDto(true,
+                List.of(new TestRunResult("Test 1", true, null)), 1, 1);
+        when(codeExecutionService.executeWithDetails(anyString(), anyList(), anyInt())).thenReturn(expected);
+
+        RunCodeResultDto result = practiceService.runCode(1L, "public class Solution {}");
+
+        assertThat(result.isCompiled()).isTrue();
+        assertThat(result.getPassedCount()).isEqualTo(1);
+        assertThat(result.getTotalCount()).isEqualTo(1);
+        assertThat(result.getResults()).hasSize(1);
+        assertThat(result.getResults().get(0).isPassed()).isTrue();
+    }
+
+    @Test
+    void runCode_compilationError_returnsCompiledFalse() {
+        when(practiceRepository.findById(1L)).thenReturn(Optional.of(practice));
+        RunCodeResultDto expected = new RunCodeResultDto(false, List.of(), 0, 1);
+        when(codeExecutionService.executeWithDetails(anyString(), anyList(), anyInt())).thenReturn(expected);
+
+        RunCodeResultDto result = practiceService.runCode(1L, "class Broken {{{");
+
+        assertThat(result.isCompiled()).isFalse();
+        assertThat(result.getPassedCount()).isEqualTo(0);
+        assertThat(result.getResults()).isEmpty();
+    }
+
+    @Test
+    void runCode_partialPass_returnsCorrectCounts() {
+        PracticeUnitTest unitTest2 = new PracticeUnitTest();
+        unitTest2.setTestCode("assert new Solution().fizzBuzz(5).equals(\"Buzz\");");
+        unitTest2.setPractice(practice);
+        practice.getUnitTests().add(unitTest2);
+
+        when(practiceRepository.findById(1L)).thenReturn(Optional.of(practice));
+        RunCodeResultDto expected = new RunCodeResultDto(true,
+                List.of(new TestRunResult("Test 1", true, null),
+                        new TestRunResult("Test 2", false, "Expected Buzz")),
+                1, 2);
+        when(codeExecutionService.executeWithDetails(anyString(), anyList(), anyInt())).thenReturn(expected);
+
+        RunCodeResultDto result = practiceService.runCode(1L, "public class Solution {}");
+
+        assertThat(result.isCompiled()).isTrue();
+        assertThat(result.getPassedCount()).isEqualTo(1);
+        assertThat(result.getTotalCount()).isEqualTo(2);
+        assertThat(result.getResults().get(1).isPassed()).isFalse();
+        assertThat(result.getResults().get(1).getError()).isEqualTo("Expected Buzz");
+    }
+
+    @Test
+    void runCode_notFound_throwsCodePracticeNotFoundException() {
+        when(practiceRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> practiceService.runCode(99L, "public class Solution {}"))
+                .isInstanceOf(CodePracticeNotFoundException.class)
+                .hasMessageContaining("Code practice not found");
     }
 
     @Test

@@ -6,6 +6,9 @@ import AssessX_backend.dto.CreateCodePracticeRequest;
 import AssessX_backend.dto.CsvImportResultDto;
 import AssessX_backend.dto.HintRequest;
 import AssessX_backend.dto.HintResponseDto;
+import AssessX_backend.dto.RunCodeRequest;
+import AssessX_backend.dto.RunCodeResultDto;
+import AssessX_backend.dto.RunCodeResultDto.TestRunResult;
 import AssessX_backend.dto.SubmitCodeRequest;
 import AssessX_backend.exception.CodePracticeNotFoundException;
 import AssessX_backend.exception.GlobalExceptionHandler;
@@ -319,6 +322,41 @@ class CodePracticeControllerTest {
                 .andExpect(jsonPath("$.createdPractices").value(1))
                 .andExpect(jsonPath("$.addedTests").value(1))
                 .andExpect(jsonPath("$.failedRows").isArray());
+    }
+
+    @org.junit.jupiter.api.Test
+    void runCode_validRequest_returns200WithResults() throws Exception {
+        authenticateAs("1");
+        RunCodeRequest req = new RunCodeRequest();
+        req.setCode("public class Solution { public int sum(int a, int b) { return a + b; } }");
+
+        RunCodeResultDto result = new RunCodeResultDto(true,
+                List.of(new TestRunResult("Test 1", true, null),
+                        new TestRunResult("Test 2", true, null)),
+                2, 2);
+        when(practiceService.runCode(eq(1L), anyString())).thenReturn(result);
+
+        mockMvc.perform(post("/api/practices/1/run")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.compiled").value(true))
+                .andExpect(jsonPath("$.passedCount").value(2))
+                .andExpect(jsonPath("$.totalCount").value(2))
+                .andExpect(jsonPath("$.results").isArray())
+                .andExpect(jsonPath("$.results[0].testName").value("Test 1"))
+                .andExpect(jsonPath("$.results[0].passed").value(true));
+    }
+
+    @org.junit.jupiter.api.Test
+    void runCode_missingCode_returns400() throws Exception {
+        authenticateAs("1");
+
+        mockMvc.perform(post("/api/practices/1/run")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists());
     }
 
     @org.junit.jupiter.api.Test

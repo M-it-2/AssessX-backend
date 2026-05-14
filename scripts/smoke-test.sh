@@ -254,7 +254,7 @@ if [[ -n "$HINT_TEXT" && "$HINT_TEXT" != "null" ]]; then
   echo -e "  ${BOLD}Hint preview:${RESET} ${HINT_TEXT:0:120}"
   ((PASSED++)) || true
 else
-  echo -e "  ${RED}✗${RESET} hint text is empty or null"
+  echo -e "  ${RED}-${RESET} hint text is empty or null"
   echo -e "  Raw body: $BODY"
   ((FAILED++)) || true
 fi
@@ -263,7 +263,7 @@ if [[ -n "$HINT_AT" && "$HINT_AT" != "null" ]]; then
   echo -e "  ${GREEN}✓${RESET} hintUsedAt is set: ${HINT_AT}"
   ((PASSED++)) || true
 else
-  echo -e "  ${RED}✗${RESET} hintUsedAt is null"
+  echo -e "  ${RED}-${RESET} hintUsedAt is null"
   ((FAILED++)) || true
 fi
 
@@ -385,7 +385,28 @@ echo -e "  Imported test id=${SMOKE_TEST_IMPORT_ID}"
 
 
 
-h "11. Authorization checks"
+h "11. Run Code (перевірка коду без здачі)"
+
+call POST /api/practices/${PRACTICE_ID}/run \
+  -d "{\"code\":\"${CORRECT_CODE}\"}"
+check "POST /api/practices/{id}/run correct code => 200" "200" "$STATUS"
+check "  compiled == true" "true" "$(jf '.compiled')"
+RC_PASSED=$(jf '.passedCount'); RC_TOTAL=$(jf '.totalCount')
+check "  all tests pass (${RC_PASSED}/${RC_TOTAL})" "$RC_TOTAL" "$RC_PASSED"
+
+call POST /api/practices/${PRACTICE_ID}/run \
+  -d "{\"code\":\"${WRONG_CODE}\"}"
+check "POST /api/practices/{id}/run wrong code => 200" "200" "$STATUS"
+check "  compiled == true" "true" "$(jf '.compiled')"
+check "  passedCount == 0" "0" "$(jf '.passedCount')"
+
+call POST /api/practices/${PRACTICE_ID}/run \
+  -d '{"code":""}'
+check "POST /api/practices/{id}/run empty code => 400" "400" "$STATUS"
+
+
+
+h "12. Authorization checks"
 
 call_noauth GET /api/tests
 check "GET /api/tests without token => 401" "401" "$STATUS"
@@ -394,7 +415,7 @@ call_noauth GET /api/practices -H "Authorization: Bearer invalid.token.here"
 check "GET /api/practices with invalid token => 401" "401" "$STATUS"
 
 
-h "12. Cleanup"
+h "13. Cleanup"
 call DELETE /api/assignments/${PRACTICE_ASSIGN_ID}
 check "DELETE /api/assignments/{id} (practice) => 204" "204" "$STATUS"
 

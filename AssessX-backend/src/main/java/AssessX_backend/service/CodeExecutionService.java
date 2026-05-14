@@ -1,6 +1,8 @@
 package AssessX_backend.service;
 
 import AssessX_backend.dto.CodeSubmissionResultDto;
+import AssessX_backend.dto.RunCodeResultDto;
+import AssessX_backend.dto.RunCodeResultDto.TestRunResult;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -9,7 +11,10 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -83,6 +88,44 @@ public class CodeExecutionService {
             deleteDir(taskDir.toFile());
             return new CodeSubmissionResultDto(0, total, "Execution error: " + e.getMessage());
         }
+    }
+
+    public RunCodeResultDto executeWithDetails(String studentCode, List<String> unitTestCodes, int timeLimitSec) {
+        int total = unitTestCodes.size();
+        if (total == 0) {
+            return new RunCodeResultDto(true, List.of(), 0, 0);
+        }
+        CodeSubmissionResultDto basic = execute(studentCode, unitTestCodes, timeLimitSec);
+        return parseDetailedResult(basic.getOutput(), total);
+    }
+
+    private RunCodeResultDto parseDetailedResult(String output, int total) {
+        if (!output.contains("RESULT:")) {
+            return new RunCodeResultDto(false, List.of(), 0, total);
+        }
+
+        Map<Integer, String> failedMessages = new LinkedHashMap<>();
+        for (String line : output.split("\n")) {
+            if (line.startsWith("Test ") && line.contains(" FAILED: ")) {
+                try {
+                    int failedIdx = line.indexOf(" FAILED: ");
+                    int testNum = Integer.parseInt(line.substring(5, failedIdx));
+                    String msg = line.substring(failedIdx + " FAILED: ".length());
+                    failedMessages.put(testNum, msg);
+                } catch (Exception ignored) {}
+            }
+        }
+
+        List<TestRunResult> results = new ArrayList<>();
+        for (int i = 1; i <= total; i++) {
+            if (failedMessages.containsKey(i)) {
+                results.add(new TestRunResult("Test " + i, false, failedMessages.get(i)));
+            } else {
+                results.add(new TestRunResult("Test " + i, true, null));
+            }
+        }
+
+        return new RunCodeResultDto(true, results, total - failedMessages.size(), total);
     }
 
     private String buildRunner(List<String> unitTestCodes) {
