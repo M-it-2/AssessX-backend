@@ -2,12 +2,15 @@ package AssessX_backend.controller;
 
 import AssessX_backend.dto.CreateTestRequest;
 import AssessX_backend.dto.SubmitTestRequest;
+import AssessX_backend.dto.TestImportResultDto;
 import AssessX_backend.dto.TestResponseDto;
 import AssessX_backend.dto.TestSubmitResultDto;
 import AssessX_backend.exception.GlobalExceptionHandler;
 import AssessX_backend.exception.TestNotFoundException;
 import AssessX_backend.model.Test;
 import AssessX_backend.service.TestService;
+
+import org.springframework.mock.web.MockMultipartFile;
 
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -32,6 +35,7 @@ import java.util.Map;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -249,6 +253,33 @@ class TestControllerTest {
         mockMvc.perform(post("/api/tests/1/submit")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").exists());
+    }
+
+    @org.junit.jupiter.api.Test
+    void importFromCsv_validFile_returns201WithSummary() throws Exception {
+        authenticateAs("2", "TEACHER");
+        String csvContent = "test_title,question_text,option_a,option_b,option_c,option_d,correct_option,points,time_limit_sec\n" +
+                "Java Basics,What is JVM?,Verifier,Virtual Machine,VM,None,b,20,600\n";
+        MockMultipartFile file = new MockMultipartFile("file", "tests.csv", "text/csv", csvContent.getBytes());
+
+        TestImportResultDto result = new TestImportResultDto(1, 0, List.of());
+        when(testService.importFromCsv(any(), eq(2L))).thenReturn(result);
+
+        mockMvc.perform(multipart("/api/tests/import").file(file))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.createdTests").value(1))
+            .andExpect(jsonPath("$.updatedTests").value(0))
+            .andExpect(jsonPath("$.failedRows").isArray());
+    }
+
+    @org.junit.jupiter.api.Test
+    void importFromCsv_emptyFile_returns400() throws Exception {
+        authenticateAs("2", "TEACHER");
+        MockMultipartFile file = new MockMultipartFile("file", "tests.csv", "text/csv", new byte[0]);
+
+        mockMvc.perform(multipart("/api/tests/import").file(file))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.error").exists());
     }

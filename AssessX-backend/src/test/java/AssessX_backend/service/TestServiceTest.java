@@ -2,6 +2,7 @@ package AssessX_backend.service;
 
 import AssessX_backend.dto.CreateTestRequest;
 import AssessX_backend.dto.SubmitTestRequest;
+import AssessX_backend.dto.TestImportResultDto;
 import AssessX_backend.dto.TestResponseDto;
 import AssessX_backend.dto.TestSubmitResultDto;
 import AssessX_backend.exception.*;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -259,6 +261,41 @@ class TestServiceTest {
         assertThatThrownBy(() ->
             testService.submitTest(1L, r, 1L)
         ).isInstanceOf(DeadlineExpiredException.class);
+    }
+
+    @Test
+    void importFromCsv_newTest_createsAndReturnsResult() throws Exception {
+        String csv = "test_title,question_text,option_a,option_b,option_c,option_d,correct_option,points,time_limit_sec\n" +
+                     "Java Intro,What is JVM?,Verifier,Virtual Machine,VM,None,b,20,600\n";
+        MockMultipartFile file = new MockMultipartFile("file", "tests.csv", "text/csv", csv.getBytes());
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(teacher));
+        when(testRepository.findByTitle("Java Intro")).thenReturn(Optional.empty());
+        when(testRepository.save(any(AssessX_backend.model.Test.class)))
+                .thenAnswer(i -> i.getArgument(0));
+
+        TestImportResultDto result = testService.importFromCsv(file, 1L);
+
+        assertThat(result.getCreatedTests()).isEqualTo(1);
+        assertThat(result.getUpdatedTests()).isEqualTo(0);
+        assertThat(result.getFailedRows()).isEmpty();
+        verify(testRepository).save(any(AssessX_backend.model.Test.class));
+    }
+
+    @Test
+    void importFromCsv_invalidCorrectOption_collectsFailedRow() throws Exception {
+        String csv = "test_title,question_text,option_a,option_b,option_c,option_d,correct_option,points,time_limit_sec\n" +
+                     "Bad Test,Question?,A,B,C,D,x,10,300\n";
+        MockMultipartFile file = new MockMultipartFile("file", "tests.csv", "text/csv", csv.getBytes());
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(teacher));
+
+        TestImportResultDto result = testService.importFromCsv(file, 1L);
+
+        assertThat(result.getCreatedTests()).isEqualTo(0);
+        assertThat(result.getFailedRows()).hasSize(1);
+        assertThat(result.getFailedRows().get(0)).contains("invalid correct_option");
+        verify(testRepository, never()).save(any());
     }
 
     @Test

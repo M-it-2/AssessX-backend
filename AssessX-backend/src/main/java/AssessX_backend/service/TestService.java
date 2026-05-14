@@ -2,25 +2,44 @@ package AssessX_backend.service;
 
 import AssessX_backend.dto.CreateTestRequest;
 import AssessX_backend.dto.SubmitTestRequest;
+import AssessX_backend.dto.TestImportResultDto;
 import AssessX_backend.dto.TestResponseDto;
 import AssessX_backend.dto.TestSubmitResultDto;
 import AssessX_backend.exception.*;
 import AssessX_backend.model.*;
 import AssessX_backend.repository.*;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
+
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class TestService {
+
+    private static final Logger log = LoggerFactory.getLogger(TestService.class);
 
     private final TestRepository testRepository;
     private final UserRepository userRepository;
@@ -163,6 +182,140 @@ public class TestService {
         }
 
         return new TestSubmitResultDto(earned, test.getPoints(), correct, total);
+    }
+
+    @Transactional
+    public TestImportResultDto importFromCsv(MultipartFile file, Long userId) {
+        User creator = findUserById(userId);
+
+        int createdTests = 0;
+        int updatedTests = 0;
+        List<String> failedRows = new ArrayList<>();
+
+        record QuestionRow(String text, String optA, String optB, String optC, String optD, String correctOption) {}
+
+        Map<String, List<QuestionRow>> questionsByTest = new LinkedHashMap<>();
+        Map<String, Integer> pointsByTest = new LinkedHashMap<>();
+        Map<String, Integer> timeLimitByTest = new LinkedHashMap<>();
+
+        CSVFormat format = CSVFormat.DEFAULT.builder()
+                .setHeader()
+                .setSkipHeaderRecord(true)
+                .build();
+
+        try (Reader reader = new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8);
+             CSVParser parser = CSVParser.parse(reader, format)) {
+
+            for (CSVRecord record : parser) {
+                String rowLabel = "Row " + record.getRecordNumber();
+                try {
+                    String testTitle = record.get("test_title").trim();
+                    String questionText = record.get("question_text").trim();
+                    String optA = record.get("option_a").trim();
+                    String optB = record.get("option_b").trim();
+                    String optC = record.get("option_c").trim();
+                    String optD = record.get("option_d").trim();
+                    String correctOption = record.get("correct_option").trim().toLowerCase();
+                    String pointsStr = record.get("points").trim();
+                    String timeLimitStr = record.get("time_limit_sec").trim();
+
+                    if (testTitle.isEmpty() || questionText.isEmpty() || correctOption.isEmpty()) {
+                        failedRows.add(rowLabel + ": required fields are empty");
+                        continue;
+                    }
+
+                    if (!Set.of("a", "b", "c", "d").contains(correctOption)) {
+                        failedRows.add(rowLabel + ": invalid correct_option '" + correctOption + "', must be a/b/c/d");
+                        continue;
+                    }
+
+                    int points;
+                    try {
+                        points = Integer.parseInt(pointsStr);
+                    } catch (NumberFormatException e) {
+                        failedRows.add(rowLabel + ": invalid points '" + pointsStr + "'");
+                        continue;
+                    }
+
+                    int timeLimitSec;
+                    try {
+                        timeLimitSec = Integer.parseInt(timeLimitStr);
+                    } catch (NumberFormatException e) {
+                        failedRows.add(rowLabel + ": invalid time_limit_sec '" + timeLimitStr + "'");
+                        continue;
+                    }
+
+                    if (points <= 0) {
+                        failedRows.add(rowLabel + ": points must be > 0");
+                        continue;
+                    }
+
+                    if (!questionsByTest.containsKey(testTitle)) {
+                        questionsByTest.put(testTitle, new ArrayList<>());
+                        pointsByTest.put(testTitle, points);
+                        timeLimitByTest.put(testTitle, timeLimitSec);
+                    }
+                    questionsByTest.get(testTitle).add(
+                        new QuestionRow(questionText, optA, optB, optC, optD, correctOption)
+                    );
+
+                } catch (Exception e) {
+                    failedRows.add(rowLabel + ": " + e.getMessage());
+                }
+            }
+        } catch (IOException e) {
+            throw new CsvImportException("Failed to read CSV file: " + e.getMessage());
+        }
+
+        for (String testTitle : questionsByTest.keySet()) {
+            List<QuestionRow> rows = questionsByTest.get(testTitle);
+
+            var questionsNode = objectMapper.createArrayNode();
+            var answersNode = objectMapper.createObjectNode();
+
+            for (int i = 0; i < rows.size(); i++) {
+                QuestionRow row = rows.get(i);
+                String qId = String.valueOf(i + 1);
+
+                ObjectNode question = objectMapper.createObjectNode();
+                question.put("id", qId);
+                question.put("text", row.text());
+                ObjectNode options = objectMapper.createObjectNode();
+                options.put("a", row.optA());
+                options.put("b", row.optB());
+                options.put("c", row.optC());
+                options.put("d", row.optD());
+                question.set("options", options);
+                questionsNode.add(question);
+
+                answersNode.put(qId, row.correctOption());
+            }
+
+            Optional<Test> existing = testRepository.findByTitle(testTitle);
+            Test test;
+            if (existing.isPresent()) {
+                test = existing.get();
+                test.setQuestions(toJson(questionsNode));
+                test.setAnswers(toJson(answersNode));
+                updatedTests++;
+            } else {
+                test = new Test();
+                test.setTitle(testTitle);
+                test.setQuestions(toJson(questionsNode));
+                test.setAnswers(toJson(answersNode));
+                test.setPoints(pointsByTest.get(testTitle));
+                test.setTimeLimitSec(timeLimitByTest.get(testTitle));
+                test.setCreatedBy(creator);
+                createdTests++;
+            }
+
+            testRepository.save(test);
+        }
+
+        log.info("CSV test import by user {}: created {} tests, updated {} tests, {} failed rows",
+                userId, createdTests, updatedTests, failedRows.size());
+
+        return new TestImportResultDto(createdTests, updatedTests, failedRows);
     }
 
     private String toJson(Object value) {
