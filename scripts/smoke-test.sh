@@ -284,12 +284,60 @@ call POST /api/practices/${PRACTICE_ID}/hint \
 check "POST /api/practices/{id}/hint без assignmentId => 400" "400" "$STATUS"
 
 call POST /api/practices/99999/hint \
-  -d "{\"assignmentId\":${PRACTICE_ASSIGN_ID}}"
+  -d '{"assignmentId":99999}'
 check "POST /api/practices/99999/hint => 404" "404" "$STATUS"
 
 
 
-h "9. Authorization checks"
+h "9. Bulk CSV Import"
+
+CSV_FILE="./smoke-import-${TS}.csv"
+EMPTY_FILE="./smoke-import-empty-${TS}.csv"
+
+printf 'task_name,task_description,max_score,test_class_name,test_method_name,test_code\r\nSmokeSumImport,Implement sum(a+b),15,SolutionTest,testSum,"Solution s = new Solution();assert s.sum(1,2)==3;"\r\nSmokeSumImport,Implement sum(a+b),15,SolutionTest,testSum2,"Solution s = new Solution();assert s.sum(0,0)==0;"\r\n' > "$CSV_FILE"
+
+IMPORT_RAW=$(curl -s -w "---HTTPSTATUS---%{http_code}" \
+  -X POST "${BASE}/api/practices/import" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@${CSV_FILE};type=text/csv" 2>/dev/null)
+STATUS="${IMPORT_RAW##*---HTTPSTATUS---}"
+BODY="${IMPORT_RAW%---HTTPSTATUS---*}"
+
+check "POST /api/practices/import valid CSV => 201" "201" "$STATUS"
+check "  createdPractices == 1" "1" "$(jf '.createdPractices')"
+check "  addedTests == 2" "2" "$(jf '.addedTests')"
+
+touch "$EMPTY_FILE"
+EMPTY_RAW=$(curl -s -w "---HTTPSTATUS---%{http_code}" \
+  -X POST "${BASE}/api/practices/import" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@${EMPTY_FILE};type=text/csv" 2>/dev/null)
+STATUS="${EMPTY_RAW##*---HTTPSTATUS---}"
+BODY="${EMPTY_RAW%---HTTPSTATUS---*}"
+check "POST /api/practices/import empty file => 400" "400" "$STATUS"
+
+printf 'task_name,task_description,max_score,test_class_name,test_method_name,test_code\r\nSmokeSumImport,Implement sum(a+b),15,SolutionTest,testSum3,"Solution s = new Solution();assert s.sum(5,5)==10;"\r\n' > "$CSV_FILE"
+
+IMPORT_RAW=$(curl -s -w "---HTTPSTATUS---%{http_code}" \
+  -X POST "${BASE}/api/practices/import" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@${CSV_FILE};type=text/csv" 2>/dev/null)
+STATUS="${IMPORT_RAW##*---HTTPSTATUS---}"
+BODY="${IMPORT_RAW%---HTTPSTATUS---*}"
+
+check "POST /api/practices/import upsert existing => 201" "201" "$STATUS"
+check "  createdPractices == 0 (upsert)" "0" "$(jf '.createdPractices')"
+check "  addedTests == 1 (upsert)" "1" "$(jf '.addedTests')"
+
+rm -f "$CSV_FILE" "$EMPTY_FILE"
+
+call GET /api/practices
+SMOKE_IMPORT_ID=$(echo "$BODY" | sed 's/},{/\n{/g' | grep 'SmokeSumImport' | sed 's/.*"id":\([0-9]*\).*/\1/')
+echo -e "  Imported practice id=${SMOKE_IMPORT_ID}"
+
+
+
+h "10. Authorization checks"
 
 call_noauth GET /api/tests
 check "GET /api/tests without token => 401" "401" "$STATUS"
@@ -298,7 +346,7 @@ call_noauth GET /api/practices -H "Authorization: Bearer invalid.token.here"
 check "GET /api/practices with invalid token => 401" "401" "$STATUS"
 
 
-h "10. Cleanup"
+h "11. Cleanup"
 call DELETE /api/assignments/${PRACTICE_ASSIGN_ID}
 check "DELETE /api/assignments/{id} (practice) => 204" "204" "$STATUS"
 
@@ -307,6 +355,11 @@ check "DELETE /api/assignments/{id} (test) => 204" "204" "$STATUS"
 
 call DELETE /api/practices/${PRACTICE_ID}
 check "DELETE /api/practices/{id} => 204" "204" "$STATUS"
+
+if [[ -n "$SMOKE_IMPORT_ID" ]]; then
+  call DELETE /api/practices/${SMOKE_IMPORT_ID}
+  check "DELETE /api/practices/{id} (imported) => 204" "204" "$STATUS"
+fi
 
 call DELETE /api/tests/${TEST_ID}
 check "DELETE /api/tests/{id} => 204" "204" "$STATUS"

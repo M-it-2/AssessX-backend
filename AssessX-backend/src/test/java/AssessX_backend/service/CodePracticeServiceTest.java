@@ -3,6 +3,7 @@ package AssessX_backend.service;
 import AssessX_backend.dto.CodePracticeResponseDto;
 import AssessX_backend.dto.CodeSubmissionResultDto;
 import AssessX_backend.dto.CreateCodePracticeRequest;
+import AssessX_backend.dto.CsvImportResultDto;
 import AssessX_backend.dto.SubmitCodeRequest;
 import AssessX_backend.exception.CodePracticeNotFoundException;
 import AssessX_backend.exception.DeadlineExpiredException;
@@ -25,6 +26,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -362,6 +365,65 @@ class CodePracticeServiceTest {
         practiceService.submitPractice(1L, req, 2L);
 
         verify(resultRepository).save(argThat(r -> r.getMaxPoints() == 50 && r.getPoints() == 50));
+    }
+
+    @Test
+    void importFromCsv_newPractice_createsAndReturnsDto() throws Exception {
+        String csvContent = "task_name,task_description,max_score,test_class_name,test_method_name,test_code\n" +
+                "FizzBuzz,Implement FizzBuzz,20,SolutionTest,testFizz,assert true;\n";
+        MockMultipartFile file = new MockMultipartFile("file", "practices.csv", "text/csv", csvContent.getBytes());
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(teacher));
+        when(practiceRepository.findByTitle("FizzBuzz")).thenReturn(Optional.empty());
+        when(practiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        CsvImportResultDto result = practiceService.importFromCsv(file, 1L);
+
+        assertThat(result.getCreatedPractices()).isEqualTo(1);
+        assertThat(result.getAddedTests()).isEqualTo(1);
+        assertThat(result.getFailedRows()).isEmpty();
+        verify(practiceRepository).save(argThat(p ->
+                p.getTitle().equals("FizzBuzz") &&
+                p.getPoints() == 20 &&
+                p.getTimeLimitSec() == 30 &&
+                p.getUnitTests().size() == 1
+        ));
+    }
+
+    @Test
+    void importFromCsv_existingPractice_addsTestsWithoutCreating() throws Exception {
+        String csvContent = "task_name,task_description,max_score,test_class_name,test_method_name,test_code\n" +
+                "FizzBuzz,Implement FizzBuzz,20,SolutionTest,testFizz,assert false;\n";
+        MockMultipartFile file = new MockMultipartFile("file", "practices.csv", "text/csv", csvContent.getBytes());
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(teacher));
+        when(practiceRepository.findByTitle("FizzBuzz")).thenReturn(Optional.of(practice));
+        when(practiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        CsvImportResultDto result = practiceService.importFromCsv(file, 1L);
+
+        assertThat(result.getCreatedPractices()).isEqualTo(0);
+        assertThat(result.getAddedTests()).isEqualTo(1);
+        assertThat(result.getFailedRows()).isEmpty();
+    }
+
+    @Test
+    void importFromCsv_invalidRow_collectsFailedRowAndContinues() throws Exception {
+        String csvContent = "task_name,task_description,max_score,test_class_name,test_method_name,test_code\n" +
+                ",desc,20,SolutionTest,test,assert true;\n" +
+                "Valid,desc,10,SolutionTest,test,assert true;\n";
+        MockMultipartFile file = new MockMultipartFile("file", "practices.csv", "text/csv", csvContent.getBytes());
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(teacher));
+        when(practiceRepository.findByTitle("Valid")).thenReturn(Optional.empty());
+        when(practiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        CsvImportResultDto result = practiceService.importFromCsv(file, 1L);
+
+        assertThat(result.getCreatedPractices()).isEqualTo(1);
+        assertThat(result.getAddedTests()).isEqualTo(1);
+        assertThat(result.getFailedRows()).hasSize(1);
+        assertThat(result.getFailedRows().get(0)).contains("required fields are empty");
     }
 
     @Test
