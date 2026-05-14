@@ -2,8 +2,10 @@ package AssessX_backend.controller;
 
 import AssessX_backend.dto.CreateTestRequest;
 import AssessX_backend.dto.SubmitTestRequest;
+import AssessX_backend.dto.TestImportResultDto;
 import AssessX_backend.dto.TestResponseDto;
 import AssessX_backend.dto.TestSubmitResultDto;
+import AssessX_backend.exception.CsvImportException;
 import AssessX_backend.service.TestService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -13,6 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -71,5 +74,17 @@ public class TestController {
             @AuthenticationPrincipal Jwt jwt) {
         Long userId = Long.parseLong(jwt.getSubject());
         return ResponseEntity.ok(testService.submitTest(id, request, userId));
+    }
+
+    @PostMapping("/import")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<TestImportResultDto> importFromCsv(
+            @RequestParam MultipartFile file,
+            @AuthenticationPrincipal Jwt jwt) {
+        if (file.isEmpty()) {
+            throw new CsvImportException("File is empty");
+        }
+        Long userId = Long.parseLong(jwt.getSubject());
+        return ResponseEntity.status(HttpStatus.CREATED).body(testService.importFromCsv(file, userId));
     }
 }

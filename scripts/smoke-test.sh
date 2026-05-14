@@ -337,7 +337,55 @@ echo -e "  Imported practice id=${SMOKE_IMPORT_ID}"
 
 
 
-h "10. Authorization checks"
+h "10. Bulk CSV Import (Tests)"
+
+TEST_CSV_FILE="./smoke-test-import-${TS}.csv"
+TEST_EMPTY_FILE="./smoke-test-import-empty-${TS}.csv"
+
+printf 'test_title,question_text,option_a,option_b,option_c,option_d,correct_option,points,time_limit_sec\r\nSmokeTestImport,What is JVM?,Verifier,Virtual Machine,VM,None,b,20,600\r\nSmokeTestImport,What does OOP stand for?,Old,Object-Oriented,Open,None,b,20,600\r\n' > "$TEST_CSV_FILE"
+
+TIMPORT_RAW=$(curl -s -w "---HTTPSTATUS---%{http_code}" \
+  -X POST "${BASE}/api/tests/import" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@${TEST_CSV_FILE};type=text/csv" 2>/dev/null)
+STATUS="${TIMPORT_RAW##*---HTTPSTATUS---}"
+BODY="${TIMPORT_RAW%---HTTPSTATUS---*}"
+
+check "POST /api/tests/import valid CSV => 201" "201" "$STATUS"
+check "  createdTests == 1" "1" "$(jf '.createdTests')"
+check "  updatedTests == 0" "0" "$(jf '.updatedTests')"
+
+touch "$TEST_EMPTY_FILE"
+TEMPTY_RAW=$(curl -s -w "---HTTPSTATUS---%{http_code}" \
+  -X POST "${BASE}/api/tests/import" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@${TEST_EMPTY_FILE};type=text/csv" 2>/dev/null)
+STATUS="${TEMPTY_RAW##*---HTTPSTATUS---}"
+BODY="${TEMPTY_RAW%---HTTPSTATUS---*}"
+check "POST /api/tests/import empty file => 400" "400" "$STATUS"
+
+printf 'test_title,question_text,option_a,option_b,option_c,option_d,correct_option,points,time_limit_sec\r\nSmokeTestImport,Updated question?,A,B,C,D,a,20,600\r\n' > "$TEST_CSV_FILE"
+
+TUPDATE_RAW=$(curl -s -w "---HTTPSTATUS---%{http_code}" \
+  -X POST "${BASE}/api/tests/import" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@${TEST_CSV_FILE};type=text/csv" 2>/dev/null)
+STATUS="${TUPDATE_RAW##*---HTTPSTATUS---}"
+BODY="${TUPDATE_RAW%---HTTPSTATUS---*}"
+
+check "POST /api/tests/import upsert existing => 201" "201" "$STATUS"
+check "  createdTests == 0 (upsert)" "0" "$(jf '.createdTests')"
+check "  updatedTests == 1 (upsert)" "1" "$(jf '.updatedTests')"
+
+rm -f "$TEST_CSV_FILE" "$TEST_EMPTY_FILE"
+
+call GET /api/tests
+SMOKE_TEST_IMPORT_ID=$(echo "$BODY" | sed 's/},{/\n{/g' | grep 'SmokeTestImport' | sed 's/.*"id":\([0-9]*\).*/\1/')
+echo -e "  Imported test id=${SMOKE_TEST_IMPORT_ID}"
+
+
+
+h "11. Authorization checks"
 
 call_noauth GET /api/tests
 check "GET /api/tests without token => 401" "401" "$STATUS"
@@ -346,7 +394,7 @@ call_noauth GET /api/practices -H "Authorization: Bearer invalid.token.here"
 check "GET /api/practices with invalid token => 401" "401" "$STATUS"
 
 
-h "11. Cleanup"
+h "12. Cleanup"
 call DELETE /api/assignments/${PRACTICE_ASSIGN_ID}
 check "DELETE /api/assignments/{id} (practice) => 204" "204" "$STATUS"
 
@@ -363,6 +411,11 @@ fi
 
 call DELETE /api/tests/${TEST_ID}
 check "DELETE /api/tests/{id} => 204" "204" "$STATUS"
+
+if [[ -n "$SMOKE_TEST_IMPORT_ID" ]]; then
+  call DELETE /api/tests/${SMOKE_TEST_IMPORT_ID}
+  check "DELETE /api/tests/{id} (imported) => 204" "204" "$STATUS"
+fi
 
 call DELETE /api/groups/${GROUP_ID}
 check "DELETE /api/groups/{id} => 204" "204" "$STATUS"
